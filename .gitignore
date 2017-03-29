@@ -1,0 +1,9 @@
+# ignore compiled python
+*.pyc
+
+# ignore config files
+config/
+
+# ignore output files
+test_data/
+

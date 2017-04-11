@@ -11,65 +11,64 @@ import hashlib
 import os
 import json
     
-def addHypervisors(hypervisorConfigs, vmList, logFile = None):
-    for vmData in vmList:
-        if 'HYPERVISOR_CONFIG' in vmData:
-            if vmData['HYPERVISOR_CONFIG'] not in hypervisorConfigs:
-                hypervisorConfigs.append(vmData['HYPERVISOR_CONFIG'])
-                logMsg(logFile, "ADDED " + str(vmData['HYPERVISOR_CONFIG']))
-            else:
-                logMsg(logFile, str(vmData['HYPERVISOR_CONFIG']) + " IS NOT UNIQUE")
-    
-def bailSafely(testVmList, msfVms):
-        for vm in  msfVms:
-            vm.revertDevVm()
-            vm.powerOff()
-        for vm in testVmList:
-            vm.revertToTestingBase()
-            vm.powerOff()
+def bailSafely(targets, msfHosts):
+        for host in  msfHosts:
+            if host['METHOD'] == "VM_TOOLS":
+                host['VM_OBJECT'].revertMsfVm()
+                host['VM_OBJECT'].powerOff()
+        for host in  targets:
+            if host['METHOD'] == "VM_TOOLS":
+                host['VM_OBJECT'].revertToTestingBase()
+                host['VM_OBJECT'].powerOff()
         exit(1)
 
-def createServer(configDic, logFile = "default.log"):
-    if "HYPERVISOR_TYPE" not in configDic:
+def createServer(configFile, logFile = "default.log"):
+    try:
+        fileObj = open(configFile, 'r')
+        configStr = fileObj.read()
+        fileObj.close()
+    except IOError as e:
+        logMsg(logFile, "UNABLE TO OPEN FILE: " + str(configFile) + '\n' + str(e))
+        return None
+    try:
+        hypervisorDic = json.loads(configStr)
+    except Exception as e:
+        logMsg(logFile, "UNABLE TO PARSE FILE: " + str(configFile) + '\n' + str(e))
+        return None
+    if "HYPERVISOR_TYPE" not in hypervisorDic:
         print "INVALID CONFIG FILE; NO HYPERVISOR_TYPE FOUND"
         return None
-    if configDic['HYPERVISOR_TYPE'].lower() == "esxi":
-        return esxiVm.esxiServer(configDic, logFile)
-    if configDic['HYPERVISOR_TYPE'].lower() == "workstation":
-        return workstationVm.workstationServer(configDic, logFile)
-    
-def getUniqueHypervisorConfigs(configData):
-    hypervisorConfigs = []
-    if 'MSF_VMS' in configData:
-        addHypervisors(hypervisorConfigs, configData['MSF_VMS'], configData['LOG_FILE'])
-    if 'UPLOAD_TARGETS' in configData:
-        addHypervisors(hypervisorConfigs, configData['UPLOAD_TARGETS'], configData['LOG_FILE'])
-    if 'EXPLOIT_TARGETS' in configData:
-        addHypervisors(hypervisorConfigs, configData['EXPLOIT_TARGETS'], configData['LOG_FILE'])
-    return hypervisorConfigs
+    if hypervisorDic['HYPERVISOR_TYPE'].lower() == "esxi":
+        return esxiVm.esxiServer(hypervisorDic, logFile)
+    if hypervisorDic['HYPERVISOR_TYPE'].lower() == "workstation":
+        return workstationVm.workstationServer(hypervisorDic, logFile)
+        
+def instantiateVmsAndServers(machineList, hypervisorDic, logFile):
+    for target in machineList:
+        if target['TYPE'].upper() == 'VIRTUAL':
+            if target['HYPERVISOR_CONFIG'] in hypervisorDic:
+                target['SERVER_OBJECT'] = hypervisorDic[target['HYPERVISOR_CONFIG']]
+            else:
+                 hypervisorDic[target['HYPERVISOR_CONFIG']] = createServer(target['HYPERVISOR_CONFIG'], logFile)
+                 target['SERVER_OBJECT'] = hypervisorDic[target['HYPERVISOR_CONFIG']]
+                 target['SERVER_OBJECT'].enumerateVms()
+            """
+            INSTANTIATE VM INSTANCE AND STORE IT IN THE DICTIONARY
+            """
+            for vm in target['SERVER_OBJECT'].vmList:
+                if vm.vmName == target['NAME']:
+                    logMsg(logFile, "FOUND VM: " + vm.vmName)
+                    target['VM_OBJECT'] = vm
+                    vm.setPassword(target['PASSWORD'])
+                    vm.setUsername(target['USERNAME'])
+    return None
 
-def getVmNames(configData):
-    targetVmNames   = []
-    msfVmNames      = []
-    if 'MSF_VMS' in configData:
-        for vm in configData['MSF_VMS']:
-            msfVmNames.append(vm['NAME'])
-    if 'UPLOAD_TARGETS' in configData:
-        for target in configData['UPLOAD_TARGETS']:
-            if 'HYPERVISOR_CONFIG' in target:
-                targetVmNames.append(target['NAME'])
-    if 'EXPLOIT_TARGETS' in configData:
-        for target in configData['UPLOAD_TARGET']:
-            if 'HYPERVISOR_CONFIG' in target:
-                targetVmNames.append(target['NAME'])
-    return (targetVmNames, msfVmNames)
-    
 def logMsg(logFile, strMsg):
 	if strMsg == None:
 		strMsg="[None]"
 	dateStamp = 'testlog:[' + str(datetime.now())+ '] '
 	#DELETE THIS LATER:
-	print dateStamp + strMsg
+	print dateStamp + str(strMsg)
 	try:
 		logFileObj = open(logFile, 'ab')
 		logFileObj.write(dateStamp + strMsg +'\n')
@@ -105,8 +104,9 @@ def parseTestConfig(configFile):
     requiredList.append("TARGET_SCRIPT")
     requiredList.append("HTTP_PORT")
     requiredList.append("STARTING_LISTENER")
-    requiredList.append("MSF_VMS")
-    requiredList.append("PAYLOAD_LIST")
+    requiredList.append("MSF_HOSTS")
+    requiredList.append("TARGETS")
+    requiredList.append("PAYLOADS")
     requiredList.append("COMMAND_LIST")
     requiredList.append("SUCCESS_LIST")
     for item in requiredList:
@@ -117,58 +117,53 @@ def parseTestConfig(configFile):
         return None
     
     """
-    MSF_VM_DATA
+    MSF_HOSTS
     """
     requiredMsfData = []
-    requiredMsfData.append("HYPERVISOR_CONFIG")
+    requiredMsfData.append("TYPE")
+    requiredMsfData.append("METHOD")
     requiredMsfData.append("NAME")
     requiredMsfData.append("USERNAME")
     requiredMsfData.append("PASSWORD")
     for requiredData in requiredMsfData:
-        for msfVm in jsonDic['MSF_VMS']:
-            if requiredData not in  msfVm:
-                print "NO " + requiredData + " LISTED FOR MSF_VM IN " + configFile
+        for msfHost in jsonDic['MSF_HOSTS']:
+            if requiredData not in  msfHost:
+                print "NO " + requiredData + " LISTED FOR MSF_HOST IN " + configFile
                 configPassed = False
     if not configPassed:
         return None
     """
-    SPECIFIC FOR UPLOAD_TARGETS
+    SPECIFIC FOR TARGETS
     """
-    if 'UPLOAD_TARGETS' in jsonDic:
-        #CHECK TO SEE IF WE ARE USING PYTHON AND/OR JAVA PAYLOADS
-        for payload in jsonDic['PAYLOAD_LIST']:
-            if 'java' in payload.lower():
-                hasJavaPayload = True
-            if 'python' in payload.lower():
-                hasPythonPayload = True
-        #VERIFY REQUIRED DATA IN UPLOAD_TARGET TYPES
+    for target in jsonDic['TARGETS']:
         requiredTargetData = []
-        requiredTargetData.append("HYPERVISOR_CONFIG")
+        requiredTargetData.append("TYPE")
         requiredTargetData.append("NAME")
-        requiredTargetData.append("USERNAME")
-        requiredTargetData.append("PASSWORD")
-        requiredTargetData.append("PAYLOAD_DIRECTORY")
-        if hasJavaPayload:
-            requiredTargetData.append("JAVA_PATH")
-        if hasPythonPayload:
-            requiredTargetData.append("PYTHON_PATH")
-        for uploadTarget in jsonDic['UPLOAD_TARGETS']:
-            for requiredItem in requiredTargetData:
-                if requiredItem not in uploadTarget:
-                    print "NO " + requiredItem + " LISTED FOR " + uploadTarget['NAME'] + " IN " + configFile
-                    configPassed = False
-        if not configPassed:
-            return None
-    if 'EXPLOIT_TARGETS' in jsonDic:
-        requiredExploitData = []
-        requiredExploitData.append("NAME")
-        requiredExploitData.append("IP_ADDRESS")
-        requiredExploitData.append("EXPLOIT_MODULE")
-        for exploitTarget in jsonDic['EXPLOIT_TARGETS']:
-            for requiredItem in requiredExploitData:
-                if requiredItem not in  exploitTarget:
-                    print "NO " + requiredItem + " LISTED FOR " + exploitTarget['NAME'] + " IN " + configFile
-                    configPassed = False
+        if target['METHOD'] == 'EXPLOIT':
+            requiredTargetData.append("NAME")
+            requiredTargetData.append("IP_ADDRESS")
+            requiredTargetData.append("EXPLOIT_MODULE")
+            requiredTargetData.append("EXPLOIT_SETTINGS")
+        if target['METHOD'] == "VM_TOOLS":
+            requiredTargetData.append("HYPERVISOR_CONFIG")
+            requiredTargetData.append("USERNAME")
+            requiredTargetData.append("PASSWORD")
+            requiredTargetData.append("PAYLOAD_DIRECTORY")
+            for payload in jsonDic['PAYLOADS']:
+                if 'java' in payload['NAME'].lower():
+                    hasJavaPayload = True
+                    break
+                if 'python' in payload['NAME'].lower():
+                    hasPythonPayload = True
+                    break
+            if hasJavaPayload:
+                requiredTargetData.append("JAVA_PATH")
+            if hasPythonPayload:
+                requiredTargetData.append("PYTHON_PATH")
+        for requiredItem in requiredTargetData:
+            if requiredItem not in target:
+                print "NO " + requiredItem + " LISTED FOR " + target['NAME'] + " IN " + configFile
+                configPassed = False
         if not configPassed:
             return None
     return jsonDic
@@ -189,8 +184,8 @@ def parseHypervisorConfig(hypervisorConfigFile):
     return hypervisorData
                     
 def main():
-    targetVms   = []
-    msfVms      = []
+    targets     = []
+    msfHosts    = []
     usageStatement = "autoPayloadTest <test.json>"
     if len(sys.argv) != 2:
         print "INCORRECT PARAMETER LIST:\n " + usageStatement
@@ -234,162 +229,88 @@ def main():
     """
     portNum = apt_shared.portValue(configData['STARTING_LISTENER'])
 
-    """ 
-    GET A LIST OF ALL THE HYPERVISORS WE NED TO USE FOR THE TEST
     """
-    hypervisorConfigs = getUniqueHypervisorConfigs(configData)
-    logMsg(configData['LOG_FILE'], "UNIQUE HYPERVISOR CONFIG FILES: " + str(hypervisorConfigs))
-    hypervisorDic = {}
-    for hypervisorConfig in hypervisorConfigs:
-        hypervisorData = parseHypervisorConfig(hypervisorConfig)
-        hypervisorDic[hypervisorConfig] = createServer(hypervisorData, configData['LOG_FILE'])
-        if hypervisorDic[hypervisorConfig] == None:
-            bailSafely(targetVms, msfVms)
-        else:
-            hypervisorDic[hypervisorConfig].enumerateVms()
-    for hypervisor in hypervisorDic:
-        logMsg(configData['LOG_FILE'], "VMS ON " + str(hypervisor))
-        for vm in hypervisorDic[hypervisor].vmList:
-            logMsg(configData['LOG_FILE'], str(vm.vmName))
-        
-    bailSafely(targetVms, msfVms)
+    INSTANTIATE REQUIRED SERVER INSTANCES AND ADD THEM TO THE DICTIONARY
+    THIS IS A LITTEL CLUDGY, BUT I HAVE PLANS AND THIS WILLMAKE EXTENDING 
+    A LITTLE EASIER LATER WHEN WE ADD EXTRA VM GROUPS
+    """
+    hypervisors = {}
+    instantiateVmsAndServers(configData['MSF_HOSTS']+configData['TARGETS'], hypervisors, configData['LOG_FILE'])
 
     """
-    GET A LIST OF ALL TEST VMS
+    PREP ALL MSF_HOSTS AND TARGETS
     """
-    targetVmNames, msfVmNames = getVmNames(configData)
-    logMsg(configData['LOG_FILE'], "MSF VMS: " + str(msfVmNames))
-    logMsg(configData['LOG_FILE'], "TARGET VMS: " + str(targetVmNames))
-    
-    """
-    FIND THE VMS WE WANT TO USE
-    """        
-    for vm in 
-    
-    bailSafely(targetVms, msfVms)
-    
-    """
-    PARSE THE HYPERVISOR CONFIG FILES AND INSTANTIATE THE HYPERVISOR OBJECTS
-    """
-    hypervisorObjData = {}
-    for configFile in hypervisorConfigs:
-        #PARSE THE CONFIG FILE
-        hypervisorData = parseHypervisorConfig(configFile)
-        # CREATE HYPERVISOR INSTANCE
-        hypervisorInstance = createServer(hypervisorData)
-        #CREATE THE HYPERVISOR OBJECT AND STORE IT IN A DICTIONARY WITH THE CONFIG FILENAME AS THE KEY
-        if hyperVisorInstance != None:
-            hypervisorObjData['configFile'] = hypervisorInstance
-        else:
-            logMsg(configData['LOG_FILE'], "FAILED TO CREATE HYPERVISOR INSTANCE FROM " + str(configFile))
-            bailSafely(testVms, devVms)
-        
-    """
-    ENUMERATE THE VMs ON THE HYPERVISORS AND TAG THE ONES USED IN THE TEST
-    """
-    if hyperVisorType == None:
-        logMsg(logFile, "ERROR: NO HYPERVISOR_TYPE DEFINED IN CONFIG FILE")
-        bailSafely(testVms, devVm)
-    if hyperVisorType.lower() == 'workstation':
-        try:
-            vmrunExe =          testConfig['VMRUN_EXE_PATH']
-            vmPath =            testConfig['VM_PATH']
-            vmServer = workstationVm.workstationServer(vmrunExe, vmPath)
-        except KeyError as e:
-            logMsg(logFile, "FAILED TO LOAD INFRASTRUCTURE DATA:" + str(e))
-            bailSafely(testVms, devVm)
-    elif hyperVisorType.lower() == 'esxi':
-        try:
-            hypervisorHostname =    infrastructureConfig['HYPERVISOR_HOST']
-            hyperVisorPassword =    infrastructureConfig['HYPERVISOR_PASSWORD']
-            hyperVisorUsername =    infrastructureConfig['HYPERVISOR_USERNAME']
-        except KeyError as e:
-            logMsg(logFile, "FAILED TO LOAD INFRASTRUCTURE DATA:" + str(e))
-            bailSafely(testVms, devVm)
-        vmServer = esxiVm.esxiServer(	hypervisorHostname, 
-										hyperVisorUsername, 
-										hyperVisorPassword, 
-										"443",
-										testConfig['REPORT_DIR'] + "/server.log")
-        if not vmServer.connect():
-            logMsg(logFile, "[FATAL ERROR]: FAILED TO CONNECT TO " + hypervisorHostname)
-            bailSafely(testVms, devVm)
-    else:
-        logMsg(logFile, "UNKNOWN hyperVisor TYPE: " + str(hyperVisorType))
-        exit
-    
-    """
-    SET THE DEV AND TEST VMS
-    """
-    vmServer.enumerateVms()
-    devVmList   =   apt_shared.findAndConfigVms(vmServer.vmList, [devVmData])
-    testVms   =     apt_shared.findAndConfigVms(vmServer.vmList, vmUploadTargets)
-    if len(devVmList) != 1:
-        logMsg(logFile, "[FATAL ERROR]: COULD NOT PARSE DEV_VM_DATA IN " + testJsonFile)
-        bailSafely(testVms, devVm)
-    if len(testVms) != len(vmUploadTargets):
-        logMsg(logFile, "[WARNING]: SOME TEST VM DATA DID NOT PARSE CORRECTLY!")
-        logMsg(logFile, "FOUND " + str(len(testVms)) + " TEST VMS")
-        logMsg(logFile, "FOUND " + str(len(vmUploadTargets)) + " TEST VMS")
-    if len(testVms) == 0:
-        logMsg(logFile, "[FATAL ERROR]: COULD NOT PARSE TEST_VM_DATA IN " + testJsonFile)
-        bailSafely(testVms, devVm)
-    devVm = devVmList[0]
-    print testVms
-    logMsg(logFile, "USING DEV VM: " + devVm.vmName)
-    logMsg(logFile, "FOUND " + str(len(testVms)) + " TEST VMS")
-
-    """
-    REVERT TEST VMS TO TESTING_BASE
-    SNAPSHOT DEV VM
-    START ALL THE VMS
-    """
-    usedVmList = testVms[:]
-    usedVmList.append(devVm)
-    devVm.takeTempSnapshot()
-    for vm in testVms:
-        vm.revertToTestingBase()
-    for vm in usedVmList:
-        vm.prepVm()
-    
+    #VMS
+    for host in configData['TARGETS']:
+        if host['TYPE'] == "VIRTUAL":
+            host['VM_OBJECT'].revertToTestingBase()
+    for host in configData['TARGETS'] + configData['MSF_HOSTS']:
+        if host['TYPE'] == "VIRTUAL":
+            host['VM_OBJECT'].prepVm()
     """
     WAIT FOR THE VMS TO BE READY
     """
-    if not vmServer.waitForVmsToBoot(usedVmList):
-        logMsg(logFile, "ERROR: ONE OR MORE VMS FAILED TO INITIALIZE; EXITING")
-        bailSafely(testVms, devVm)
+    for config in hypervisors:
+        vmsToCheck = []
+        for host in configData['TARGETS'] + configData['MSF_HOSTS']:
+            if host['TYPE'] == 'VIRTUAL':
+                if host['SERVER_OBJECT'] == hypervisors[config]:
+                    vmsToCheck.append(host['VM_OBJECT'])
+        if not hypervisors[config].waitForVmsToBoot(vmsToCheck):
+            logMsg(configData['LOG_FILE'], "ERROR: ONE OR MORE VMS FAILED TO INITIALIZE; EXITING")
+            bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
     """
-    CREATE REQUIRED DIRECTORY
+    CREATE REQUIRED DIRECTORY FOR PAYLOADS ON VM_TOOLS MANAGED MACHINES
     """
-    for vm in testVms:
-        if 'windows' in vm.vmOS.lower():
-            vm.makeDirOnGuest(testConfig['WIN_PAYLOAD_DIRECTORY'])
-        else:
-            vm.makeDirOnGuest(testConfig['NIX_PAYLOAD_DIRECTORY'])
+    for host in configData['TARGETS']:
+        if host['METHOD'] == "VM_TOOLS":
+            host['VM_OBJECT'].makeDirOnGuest(host['PAYLOAD_DIRECTORY'])
     
     """
-    GENERATE LIST OF ALL VMS + APPLICABLE PAYLOADS FOR THAT VM
+    IF GLOBAL PAYLOADS ARE LISTED ADD THEM TO THE SPECIFIC PAYLOADS, IF THEY EXIST
     """
-    msfPath = "/home/" + devVm.getUsername() + "/rapid7/metasploit-framework/"
-    localScriptName =    testConfig['SCRIPT_DIR'] + "/" + payloadCreationScript
-    remoteScriptName = msfPath + payloadCreationScript
-    for i in testVms:
-        for j in payloadTypeList:
-            if not (('x86' in i.getArch()) and ('x64' in j.lower())):
-                i.payloadList.append(apt_shared.makeMetCmd(j, 
-                                                           devVm.getVmIp(), 
-                                                           i.getVmIp(), 
-                                                           str(portNum.get()), 
-                                                           cmdList))
-    
-    remoteCommitFile = msfPath + "commit_tag_" + testConfig['TIMESTAMP']
-    apt_shared.makeDevPayloadScript(devVm.getVmIp(), 
-                                    msfPath, 
-                                    testVms, 
-                                    httpPort, 
-                                    localScriptName,
-                                    remoteCommitFile)
-    
+    if "PAYLOADS" in configData:
+        for target in configData['TARGETS']:
+            if 'PAYLOADS' not in target:
+                target['PAYLOADS'] = []
+            for payload in configData['PAYLOADS']:
+                if 'x64' not in target['NAME'].lower() and 'x64' in payload['NAME'].lower():
+                    #MISMATCHED ARCH; BAIL
+                    continue
+                if 'win' in target['NAME'].lower() and 'mettle' in payload['NAME'].lower():
+                    #DO ONT USE METTLE PAYLOADS ON WINDOWS
+                    continue
+                if 'win' not in target['NAME'].lower() and 'win' in payload['NAME'].lower():
+                    #ONLY USE WIN PAYLOADS ON WIN
+                    continue
+                target['PAYLOADS'].append(payload)
+    for target in configData['TARGETS']:
+        logMsg(configData['LOG_FILE'], "PAYLOADS FOR " + target['NAME'])
+        for payload in target['PAYLOADS']:
+            logMsg(configData['LOG_FILE'], payload['NAME'])
+    bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
+            
+                    
+                    
+                    
+                    
+                    
+                    
+    """                    
+                    (apt_shared.makeMetCmd(j, 
+                                                               devVm.getVmIp(), 
+                                                               i.getVmIp(), 
+                                                               str(portNum.get()), 
+                                                               cmdList))
+        
+        remoteCommitFile = msfPath + "commit_tag_" + testConfig['TIMESTAMP']
+        apt_shared.makeDevPayloadScript(devVm.getVmIp(), 
+                                        msfPath, 
+                                        testVms, 
+                                        httpPort, 
+                                        localScriptName,
+                                        remoteCommitFile)
+    """
     """
     UPLOAD AND RUN THE PAYLOAD GENERATOR/REVERSE HANDLER SCRIPT
     """

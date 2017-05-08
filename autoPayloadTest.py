@@ -1,4 +1,5 @@
 import sys
+from samba.dcerpc.dcerpc import DCERPC_NCACN_PAYLOAD_OFFSET
 sys.path.insert(0, '../vm-automation')
 
 import workstationVm
@@ -12,15 +13,48 @@ import os
 import json
     
 def bailSafely(targets, msfHosts):
-        for host in  msfHosts:
-            if host['METHOD'] == "VM_TOOLS":
-                host['VM_OBJECT'].revertMsfVm()
-                host['VM_OBJECT'].powerOff()
-        for host in  targets:
-            if host['METHOD'] == "VM_TOOLS":
-                host['VM_OBJECT'].revertToTestingBase()
-                host['VM_OBJECT'].powerOff()
-        exit(1)
+    print "AN ERROR HAPPENED; RETURNING VMS TO THIER FULL UPRIGHT AND LOCKED POSITIONS"
+    timeToWait = 10
+    for i in range(timeToWait):
+        print "SLEEPING FOR " + str(timeToWait-i) + " SECOND(S); EXIT NOW TO PRESERVE VMS!"
+        time.sleep(1)
+    for host in  msfHosts:
+        if host['TYPE'] == "VIRTUAL":
+            host['VM_OBJECT'].revertMsfVm()
+            host['VM_OBJECT'].powerOff()
+    for host in  targets:
+        if host['TYPE'] == "VIRTUAL":
+            host['VM_OBJECT'].revertToTestingBase()
+            host['VM_OBJECT'].powerOff()
+    exit(1)
+
+def breakoutClones(hostDicList, logFile):
+    for host in hostDicList:
+        if "CLONES" in host:
+            numClones = len(host['CLONES']) + 1 #Don't forget the original
+            logMsg(logFile, "FOUND " + str(numClones) + " CLONES")
+            if 'SESSION_DATASETS' in host:
+                numSessions = len(host['SESSION_DATASETS'])
+                sessionsPerClone = numSessions/numClones
+                logMsg(logFile, "USING " + str(sessionsPerClone) + " PAYLOADS PER CLONE")
+            for clone in host['CLONES']:
+                cloneDic = {}
+                for item in host:
+                    if item == 'NAME':
+                        cloneDic[item] = clone['NAME']
+                        logMsg(logFile, "ADDED CLONE " + clone['NAME'])
+                    elif item == 'HYPERVISOR_CONFIG':
+                        cloneDic[item] = clone['HYPERVISOR_CONFIG'] 
+                    elif item == 'SESSION_DATASETS':
+                        if 'SESSION_DATASETS' not in clone:
+                            cloneDic['SESSION_DATASETS'] = []
+                        for index in range(sessionsPerClone):
+                            cloneDic[item].append(host[item].pop(0))
+                    elif item == 'CLONES':
+                        continue
+                    else:
+                        cloneDic[item] = host[item]
+                hostDicList.append(cloneDic)
 
 def createServer(configFile, logFile = "default.log"):
     try:
@@ -39,10 +73,17 @@ def createServer(configFile, logFile = "default.log"):
         print "INVALID CONFIG FILE; NO HYPERVISOR_TYPE FOUND"
         return None
     if hypervisorDic['HYPERVISOR_TYPE'].lower() == "esxi":
-        return esxiVm.esxiServer(hypervisorDic, logFile)
+        return esxiVm.createFromConfig(hypervisorDic, logFile)
     if hypervisorDic['HYPERVISOR_TYPE'].lower() == "workstation":
         return workstationVm.workstationServer(hypervisorDic, logFile)
-        
+
+def expandGlobalList(hostList, globalList, listName):
+    for target in hostList:
+        if listName not in target:
+            target[listName] = []
+        for listItem in globalList:
+            target[listName].append(listItem)
+            
 def instantiateVmsAndServers(machineList, hypervisorDic, logFile):
     for target in machineList:
         if target['TYPE'].upper() == 'VIRTUAL':
@@ -57,7 +98,7 @@ def instantiateVmsAndServers(machineList, hypervisorDic, logFile):
             """
             for vm in target['SERVER_OBJECT'].vmList:
                 if vm.vmName == target['NAME']:
-                    logMsg(logFile, "FOUND VM: " + vm.vmName)
+                    logMsg(logFile, "FOUND VM: " + vm.vmName + " ON " + vm.server.hostname)
                     target['VM_OBJECT'] = vm
                     vm.setPassword(target['PASSWORD'])
                     vm.setUsername(target['USERNAME'])
@@ -99,9 +140,6 @@ def parseTestConfig(configFile):
     requiredList = []
     requiredList.append("TEST_NAME")
     requiredList.append("REPORT_PREFIX")
-    requiredList.append("PAYLOAD_CREATION_SCRIPT")
-    requiredList.append("BIND_SCRIPT")
-    requiredList.append("TARGET_SCRIPT")
     requiredList.append("HTTP_PORT")
     requiredList.append("STARTING_LISTENER")
     requiredList.append("MSF_HOSTS")
@@ -141,9 +179,8 @@ def parseTestConfig(configFile):
         requiredTargetData.append("NAME")
         if target['METHOD'] == 'EXPLOIT':
             requiredTargetData.append("NAME")
-            requiredTargetData.append("IP_ADDRESS")
-            requiredTargetData.append("EXPLOIT_MODULE")
-            requiredTargetData.append("EXPLOIT_SETTINGS")
+            if target['TYPE'] != 'VIRTUAL':
+                requiredTargetData.append("IP_ADDRESS")
         if target['METHOD'] == "VM_TOOLS":
             requiredTargetData.append("HYPERVISOR_CONFIG")
             requiredTargetData.append("USERNAME")
@@ -184,21 +221,19 @@ def parseHypervisorConfig(hypervisorConfigFile):
     return hypervisorData
                     
 def main():
-    targets     = []
-    msfHosts    = []
     usageStatement = "autoPayloadTest <test.json>"
     if len(sys.argv) != 2:
         print "INCORRECT PARAMETER LIST:\n " + usageStatement
         bailSafely(testVms, msfVms)
-
+    
     testJsonFile =              sys.argv[1]
     configData = parseTestConfig(testJsonFile)
     if None == configData:
         print "THERE WAS A PROBLEM WITH THE TEST JSON CONFIG FILE"
-        bailSafely(testVms, msfVms)
+        exit(1)
     
     """
-    SET UP DIRECTORIES
+    SET UP DIRECTORY NAMES IN THE CONFIG DICTIONARY
     """
     configData['TIMESTAMP'] =   str(time.time()).split('.')[0]
     configData['DATA_DIR']  =   os.getcwd() + "/" + "test_data"
@@ -222,58 +257,53 @@ def main():
     ADD LOGFILE TO THE configData DICTIONARY
     """
     configData['LOG_FILE'] =    configData['REPORT_DIR'] + "/testlog.log"
-
+    
     """
-    UNIQUE, SEQUENTIAL PORT NUMBERS FOR LISTENING/CALLBACK ARE GENERATED
-    BY A SINGLETON-TYPE CLASS MONSTROSITY; PREP IT
+    I WANTED TO AVOID PORT COLLISIONS< SO I MADE A CLASS THAT TRACKS THE PORTS AND 
+    EACH TIME YOU RUN get() ON IT, IT RETURNS A PORT VALUE AND INCREMENTS IT SO
+    AS LONG AS YOU GET PORTS FROM THIS STRUCT, THEY WILL NEVER COLLIDE.
+    IT IS AS CLOSE AS I SEEM TO BE ABLE TO GET IN PYTHON TO A SINGLETON
     """
     portNum = apt_shared.portValue(configData['STARTING_LISTENER'])
 
     """
-    INSTANTIATE REQUIRED SERVER INSTANCES AND ADD THEM TO THE DICTIONARY
-    THIS IS A LITTEL CLUDGY, BUT I HAVE PLANS AND THIS WILLMAKE EXTENDING 
-    A LITTLE EASIER LATER WHEN WE ADD EXTRA VM GROUPS
+    CREATE STAGE SCRIPTS
+        STAGE_ONE_SCRIPT: 
+            RUNS ON MSF_HOSTS AND CONTAIN THE MSFVENOM COMMANDS TO 
+            CREATE THE PAYLOADS THAT NEED TO BE UPLOADED TO THE TARGETS,
+            START AN HTTP SERVER ON THE MSF_HOSTS TO SERVE THE PAYLOADS,
+            AND LAUNCH THE SPECIFIED EXPLOITS
+        STAGE_TWO_SCRIPTS:
+            RUN ON TARGET SYSTEMS AND CONTAIN THE COMMANDS TO DOWNLOAD 
+            THE PAYLOADS FROM THE MSF_HOSTS AND LAUNCH THEM ON THE TARGETS
+        STAGE_THREE_SCRIPT:
+            RUN ON THE MSF_HOSTS TO ESTABLISH CONNECTIONS TO THE BIND PAYLOADS
     """
-    hypervisors = {}
-    instantiateVmsAndServers(configData['MSF_HOSTS']+configData['TARGETS'], hypervisors, configData['LOG_FILE'])
-
-    """
-    PREP ALL MSF_HOSTS AND TARGETS
-    """
-    #VMS
+    lineComment = '\n#################################################################\n'
+    for host in configData['MSF_HOSTS']:
+        host['STAGE_ONE_SCRIPT'] = lineComment + "\n # STAGE ONE SCRIPT FOR " + host['NAME'] + lineComment
+        host['STAGE_THREE_SCRIPT'] = lineComment + "\n # STAGE THREE SCRIPT FOR " + host['NAME'] + lineComment
     for host in configData['TARGETS']:
-        if host['TYPE'] == "VIRTUAL":
-            host['VM_OBJECT'].revertToTestingBase()
-    for host in configData['TARGETS'] + configData['MSF_HOSTS']:
-        if host['TYPE'] == "VIRTUAL":
-            host['VM_OBJECT'].prepVm()
-    """
-    WAIT FOR THE VMS TO BE READY
-    """
-    for config in hypervisors:
-        vmsToCheck = []
-        for host in configData['TARGETS'] + configData['MSF_HOSTS']:
-            if host['TYPE'] == 'VIRTUAL':
-                if host['SERVER_OBJECT'] == hypervisors[config]:
-                    vmsToCheck.append(host['VM_OBJECT'])
-        if not hypervisors[config].waitForVmsToBoot(vmsToCheck):
-            logMsg(configData['LOG_FILE'], "ERROR: ONE OR MORE VMS FAILED TO INITIALIZE; EXITING")
-            bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
-    """
-    CREATE REQUIRED DIRECTORY FOR PAYLOADS ON VM_TOOLS MANAGED MACHINES
-    """
-    for host in configData['TARGETS']:
-        if host['METHOD'] == "VM_TOOLS":
-            host['VM_OBJECT'].makeDirOnGuest(host['PAYLOAD_DIRECTORY'])
+        host['STAGE_TWO_SCRIPT'] = lineComment + "\n # STAGE TWO SCRIPT FOR " + host['NAME'] + lineComment   
     
     """
-    IF GLOBAL PAYLOADS ARE LISTED ADD THEM TO THE SPECIFIC PAYLOADS, IF THEY EXIST
+    IF GLOBAL PAYLOADS OR EXPLOITS ARE LISTED, FILTER THEM AS BEST WE CAN AND ADD THEM TO EACH TARGET
+    ALSO, REPLACE THE KEYWORD 'UNIQUE_PORT' WITH A UNIQUE PORT IN BOTH THE PAYLOAD AND EXPLOIT SETTINGS
+    NB: I THINK USING GLOBAL EXPLOITS IS A TERRIBLE IDEA, BUT I AM AN ENABLER
     """
-    if "PAYLOADS" in configData:
-        for target in configData['TARGETS']:
-            if 'PAYLOADS' not in target:
-                target['PAYLOADS'] = []
+    for target in configData['TARGETS']:
+        if 'PAYLOADS' not in target:
+            target['PAYLOADS'] = []
+        if 'EXPLOITS' not in target:
+            target['EXPLOITS'] = []
+        if 'SESSION_DATASETS' not in target:
+            target['SESSION_DATASETS'] = []
+        if 'PAYLOADS' in configData:
             for payload in configData['PAYLOADS']:
+                #REPLACE THE STRING 'UNIQUE_PORT' WITH AN ACTUAL UNIQUE PORT
+                for settingItem in payload['SETTINGS']:
+                    while "UNIQUE_PORT" in settingItem:
+                        settingItem = settingItem.replace("UNIQUE_PORT", str(portNum.get()), 1)
                 if 'x64' not in target['NAME'].lower() and 'x64' in payload['NAME'].lower():
                     #MISMATCHED ARCH; BAIL
                     continue
@@ -283,197 +313,541 @@ def main():
                 if 'win' not in target['NAME'].lower() and 'win' in payload['NAME'].lower():
                     #ONLY USE WIN PAYLOADS ON WIN
                     continue
-                target['PAYLOADS'].append(payload)
+                else:
+                    target['PAYLOADS'].append(payload.copy())
+        if 'EXPLOITS' in configData:
+            for exploit in configData['EXPLOITS']:
+                #REPLACE THE STRING 'UNIQUE_PORT' WITH AN ACTUAL UNIQUE PORT
+                for settingItem in exploit['SETTINGS']:
+                    while "UNIQUE_PORT" in settingItem:
+                        settingItem = settingItem.replace("UNIQUE_PORT", str(portNum.get()), 1)
+                if 'exploit/multi/handler' == exploit['NAME'].lower() and 'upload' in target['METHOD']:
+                    continue
+                if 'x64' not in target['NAME'].lower() and 'x64' in exploit['NAME'].lower():
+                    #MISMATCHED ARCH; BAIL
+                    continue
+                if 'win' in target['NAME'].lower() and 'mettle' in exploit['NAME'].lower():
+                    #DO ONT USE METTLE PAYLOADS ON WINDOWS
+                    continue
+                if 'win' not in target['NAME'].lower() and 'win' in exploit['NAME'].lower():
+                    #ONLY USE WIN PAYLOADS ON WIN
+                    continue
+                if exploit['NAME'] in target['EXPLOITS']:
+                    continue
+                else:
+                    target['EXPLOITS'].append(exploit)
+    
+    """
+    NOW EACH HOST HAS A LIST OF ALL THE EXPLOITS AND PAYLOADS IT NEEDS TO USE...... ASSEMBLE THEM TO FORM VOLTRON..... 
+    I MEAN SESSION_DATA
+    """
     for target in configData['TARGETS']:
-        logMsg(configData['LOG_FILE'], "PAYLOADS FOR " + target['NAME'])
-        for payload in target['PAYLOADS']:
-            logMsg(configData['LOG_FILE'], payload['NAME'])
-    bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
+        if 'EXPLOITS' not in target:
+            logMsg(configData['LOG_FILE'], "CONFIG FILE DID NOT HAVE EXPLOITS LISTED FOR " + target['NAME'] + ".  NOTHING TO TEST?")
+            bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
+        if 'PAYLOADS' not in target:
+            logMsg(configData['LOG_FILE'], "CONFIG FILE DID NOT HAVE PAYLOADS LISTED FOR " + target['NAME'] + ".  NOTHING TO TEST?")
+            bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
+        for exploit in target['EXPLOITS']:
+            for payload in target['PAYLOADS']:
+                tempDic = {}
+                tempDic['EXPLOIT'] = exploit
+                tempDic['PAYLOAD'] = payload
+                target['SESSION_DATASETS'].append(tempDic)
+    
+    """
+    JUST A DEBUG PRINT HERE TO VERIFY THE STRUCTURES WERE CREATED CORRECTLY
+    """
+    for target in configData['TARGETS']:
+        logMsg(configData['LOG_FILE'], "================================================================================")
+        logMsg(configData['LOG_FILE'], "SESSION_DATASETS FOR " + target['NAME'])
+        logMsg(configData['LOG_FILE'], "================================================================================")
+        for sessionData in target['SESSION_DATASETS']:
+            logMsg(configData['LOG_FILE'], sessionData['EXPLOIT']['NAME'] + ":" + sessionData['PAYLOAD']['NAME'])
             
-                    
-                    
-                    
-                    
-                    
-                    
-    """                    
-                    (apt_shared.makeMetCmd(j, 
-                                                               devVm.getVmIp(), 
-                                                               i.getVmIp(), 
-                                                               str(portNum.get()), 
-                                                               cmdList))
-        
-        remoteCommitFile = msfPath + "commit_tag_" + testConfig['TIMESTAMP']
-        apt_shared.makeDevPayloadScript(devVm.getVmIp(), 
-                                        msfPath, 
-                                        testVms, 
-                                        httpPort, 
-                                        localScriptName,
-                                        remoteCommitFile)
     """
+    PROCESS CLONES
+    NOW THAT THE PAYLOAD?EXPLOIT DATA IS NEATLY PLACED INTO THE SESSION_DATASETS LIST< WHEN WE PROCESS CLONES,
+    ALL WE NEED TO DO IS COPY THE EXISTING DATA OVER EXCEPT THE HYPERVISOR CONFIGS AND THE SESSION_DATASETS
+    HYPERVISOR CONFIGS REMAIN INDIVIDUAL AND SESSION_DATASETS ARE SPLIT AMONG THE TARGET CLONES
     """
-    UPLOAD AND RUN THE PAYLOAD GENERATOR/REVERSE HANDLER SCRIPT
-    """
-    if not devVm.uploadFileToGuest(localScriptName, remoteScriptName):
-        logMsg(logFile, "[FATAL ERROR]: FAILED TO UPLOAD PAYLOAD CREATION SCRIPT TO " + devVm.vmName)
-        bailSafely(testVms, devVm)
-    chmodCmdList = "/bin/chmod 755".split() + [remoteScriptName]
-    if not devVm.runCmdOnGuest(chmodCmdList):
-        logMsg(logFile, "[FATAL ERROR]: FAILED RUN " + ' '.join(chmodCmdList) + " ON " + devVm.vmName)
-        bailSafely(testVms, devVm)
-    if not devVm.runCmdOnGuest([remoteScriptName]):
-        logMsg(logFile, "[FATAL ERROR]: FAILED RUN " + remoteScriptName + " ON " + devVm.vmName)
-        bailSafely(testVms, devVm)
+    breakoutClones(configData['MSF_HOSTS'], configData['LOG_FILE'])
+    breakoutClones(configData['TARGETS'], configData['LOG_FILE'])
     
     """
-    WAIT FOR THE SCRIPT TO FINISH....
+    EXPAND COMMAND_LIST AND SUCCESS_LIST TO ALL TARGETS
     """
-    logMsg(logFile, "WAITING FOR PAYLOADS TO GENERATE...")
-    pollingGap = 1
-    pollingTimes = 1200
-    try:
-        for i in range(pollingTimes):
-            time.sleep(pollingGap)
-            devVm.updateProcList()
-            procStr = ' '.join(devVm.procList)
-            if payloadCreationScript not in procStr:
-                logMsg(logFile, "PAYLOAD CREATION SCRIPT FINISHED")
-                break
-            else:
-                if i%20 == 0:
-                    logMsg(logFile, "PAYLOAD CREATION SCRIPT STILL RUNNING")
-    except KeyboardInterrupt:
-        print "CAUGHT KEYBOARD INTERRUPT; SKIPPING WAIT...."
+    expandGlobalList(configData['TARGETS'], configData['COMMAND_LIST'], "COMMAND_LIST")
+    expandGlobalList(configData['TARGETS'], configData['SUCCESS_LIST'], "SUCCESS_LIST")
+            
+    """
+    FIGURE OUT HOW MANY PAYLOADS WE HAVE AND HOW MANY MSF_HOSTS WE HAVE
+    SO WE CAN SPLIT THE WORK AMONG ALL MSF_HOSTS
+    """
+    msfHostCount = len(configData['MSF_HOSTS'])
+    for host in configData['TARGETS']:
+        if 'SESSION_DATASETS' in host:
+            sessionCount = len(host['SESSION_DATASETS'])
+        else:
+            logMsg(configData['LOG_FILE'], "NO TESTING DATA LISTED FOR " + host['NAME'])
+            bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
+    logMsg(configData['LOG_FILE'], "MSF_HOST COUNT = " + str(msfHostCount))
+    logMsg(configData['LOG_FILE'], "SESSION COUNT = " + str(sessionCount))
     
+    """
+    JUST A DEBUG PRINT HERE TO VERIFY THE STRUCTURES WERE CREATED CORRECTLY
+    """
+    for target in configData['TARGETS']:
+        logMsg(configData['LOG_FILE'], "================================================================================")
+        logMsg(configData['LOG_FILE'], "SESSION_DATASETS FOR " + target['NAME'])
+        logMsg(configData['LOG_FILE'], "================================================================================")
+        for sessionData in target['SESSION_DATASETS']:
+            logMsg(configData['LOG_FILE'], sessionData['EXPLOIT']['NAME'] + ":" + sessionData['PAYLOAD']['NAME'])
+            
+    """
+    INSTANTIATE REQUIRED SERVER INSTANCES AND ADD THEM TO THE DICTIONARY
+    """
+    hypervisors = {}
+    instantiateVmsAndServers(configData['MSF_HOSTS']+configData['TARGETS'], hypervisors, configData['LOG_FILE'])
 
     """
-    MAKE PYTHON AND/OR BASH(ISH) SCRIPTS FOR TARGET MACHINES TO START PAYLOADS
+    PREP ALL MSF_HOSTS AND TARGETS
+    FOR MSF_HOSTS:
+    1. TAKE A SNAPSHOT
+    2. POWER-ON
+
+    FOR VIRTUAL TARGETS:
+    1. IF THERE'S a SNAPSHOT TO USE, REVERT TO IT; OTHERWISE, TAKE A TEMP SNAPSHOT
+    2. POWER-ON
+    
+    FOR PHYSICAL TARGETS:
+    1. ASSUME THEY ARE READY (FOR NOW..... I HAVE FUN PLANS FOR LATER)
+    """
+
+    for host in configData['MSF_HOSTS']:
+        host['VM_OBJECT'].takeTempSnapshot()
+    for host in configData['TARGETS']:
+        if host['TYPE'] == "VIRTUAL":
+            if 'TESTING_SNAPSHOT' in host:
+                host['VM_OBJECT'].revertToSnapshotByName(host['TESTING_SNAPSHOT'])
+            else:
+                host['VM_OBJECT'].takeTempSnapshot()
+    for host in configData['TARGETS'] + configData['MSF_HOSTS']:
+        if host['TYPE'] == 'VIRTUAL':
+            host['VM_OBJECT'].getSnapshots()
+            host['VM_OBJECT'].powerOn(False)
+
+    """
+    WAIT FOR THE VMS TO BE READY
+    """
+    for config in hypervisors:
+        vmsToCheck = []
+        for host in configData['TARGETS'] + configData['MSF_HOSTS']:
+            if host['TYPE'] == 'VIRTUAL' and 'IP_ADDRESS' not in host:
+                if host['SERVER_OBJECT'] == hypervisors[config]:
+                    vmsToCheck.append(host['VM_OBJECT'])
+        if not hypervisors[config].waitForVmsToBoot(vmsToCheck):
+            logMsg(configData['LOG_FILE'], "ERROR: ONE OR MORE VMS FAILED TO INITIALIZE; EXITING")
+            bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
+        for host in configData['TARGETS'] + configData['MSF_HOSTS']:
+            if host['TYPE'] == 'VIRTUAL' and 'IP_ADDRESS' not in host:
+                host['IP_ADDRESS'] = host['VM_OBJECT'].getVmIp()
+
+    """
+    CREATE REQUIRED DIRECTORY FOR PAYLOADS ON VM_TOOLS MANAGED MACHINES
+    CAN'T DO THIS EARLIER, AS THE MACHINES WERE OFF....
+    """
+    for host in configData['TARGETS']:
+        if host['METHOD'] == "VM_TOOLS_UPLOAD":
+            host['VM_OBJECT'].makeDirOnGuest(host['PAYLOAD_DIRECTORY'])
+            
+    """
+    THIS SECTION MARSHALLS THE DATA WE WILL NEED LATER TO GENERATE THE THREE STAGED SCRIPTS
+    TO MAKE THE STAGE ONE SCRIPT, CREATE THE MSFVENOM COMMANDS AND RC SCRIPTS, THEN SPLIT 
+    THEM BETWEEN THE MSF_HOSTS
+    
+    FOR EACH PAYLOAD TO AN UPLOAD TARGET:
+    PREP STAGE ONE SCRIPT:
+        (1) GENERATE THE MSFVENOM COMMAND TO EXECUTE ON THE MSF_HOST TO MAKE THE PAYLOAD
+        (2) ADD THE MSFVENOM COMMAND TO THE STAGE ONE SCRIPT
+        (3) GENERATE AN RC SCRIPT TO RUN ON THE MSFHOST TO SET UP THE PAYLOAD HANDLER
+        (4) WRITE THE RC SCRIPT TO DISK LOCALLY
+        (5) ADD COMMANDS TO THE STAGE ONE SCRIPT TO LAUNCH MSFCONSOLE WITH RC SCRIPTS TO SET UP FOR REVERSE PAYLOAD CALLBACKS
+        (6) ADD COMMAND TO STAGE ONE SCRIPT TO START HTTP SERVER LOCALLY TO HOST THE PAYLOADS FOR DOWNLOAD
+    PREP STAGE TWO SCRIPT:
+        (1) DETERMINE OS OF TARGET TO DETERMINE WHAT KIND OF SCRIPT WE NEED
+        (2) ADD COMANDS TO THE STAGE TWO SCRIPT SO THE TAGETS DOWNLOAD THE PAYLOAD AND EXECUTE IT
+    (5) 
+    """
+    """
+    THE FIRST FEW LINES OF THE STAGE ONE SCRIPT PREP THINGS
+    """
+    fileId=0;
+    for host in configData['MSF_HOSTS']:
+        fileId = fileId + 1
+        # STAGE ONE SCRIPT STUFF
+        host['COMMIT_FILE'] = host['MSF_PATH'] + "commit_tag_" + configData['TIMESTAMP']
+        host['STAGE_ONE_FILENAME'] = configData['SCRIPT_DIR'] + '/' + "stageOneScript_" +  str(fileId) + ".sh"
+        stageOneContent = "#!/bin/bash -l \n\n"
+        stageOneContent = stageOneContent + "cd " + host['MSF_PATH'] + "\n"
+        stageOneContent = stageOneContent + "mkdir test_payloads\n"
+        stageOneContent = stageOneContent + "mkdir test_rc\n"
+        stageOneContent = stageOneContent + "git fetch --all\n"
+        stageOneContent = stageOneContent + "git pull upstream master\n"
+        stageOneContent = stageOneContent + "git log | head -n 1 > " + host['COMMIT_FILE'] + "\n"
+        stageOneContent = stageOneContent + "gem install bundler\n"
+        stageOneContent = stageOneContent + "bundle install\n"
+        host['STAGE_ONE_SCRIPT'] = stageOneContent
+        host['STAGE_THREE_SCRIPT'] = "cd " + host['MSF_PATH'] + "\n"
+    # MAKE THE REST OF THE STAGE ONE SCRIPT
+    sleepBreak = "\nsleep(2)\n"
+    sessionCounter = 0
+    for host in configData['TARGETS']:
+        logMsg(configData['LOG_FILE'], "=============================================================================")
+        logMsg(configData['LOG_FILE'], host['NAME'])
+        logMsg(configData['LOG_FILE'], "=============================================================================")
+        for sessionData in host['SESSION_DATASETS']:
+            sessionData['PAYLOAD']['PRIMARY_PORT'] = portNum.get()
+#            logMsg(configData['LOG_FILE'], "ASSIGNING PORT VALUE " + str(sessionData['PAYLOAD']['PRIMARY_PORT']) + \
+#                    " TO " + sessionData['PAYLOAD']['NAME'] + " : " + sessionData['EXPLOIT']['NAME'] + ":" + host['NAME'])
+            sessionData['MSF_HOST'] = configData['MSF_HOSTS'][sessionCounter % len(configData['MSF_HOSTS'])]
+            sessionCounter = sessionCounter + 1
+            logMsg(configData['LOG_FILE'], "ASSIGNING TO MSF_HOST " + sessionData['MSF_HOST']['NAME'])
+            stageOneContent = '\n\n##########################\n'
+            stageOneContent = stageOneContent + '# EXPLOIT:  ' + sessionData['EXPLOIT']['NAME'] + '\n'
+            stageOneContent = stageOneContent + '# PAYLOAD:  ' + sessionData['PAYLOAD']['NAME'] + '\n'
+            stageOneContent = stageOneContent + '# TARGET:   ' + host['IP_ADDRESS'] + '\n'
+            stageOneContent = stageOneContent + '# MSF_HOST: ' + sessionData['MSF_HOST']['IP_ADDRESS'] + '\n'
+            stageOneContent = stageOneContent + '#\n'
+#            stageOneContent = stageOneContent + '#sleep 5\n'
+            if sessionData['EXPLOIT']['NAME'].lower() == 'exploit/multi/handler':
+                # WE NEED TO ADD THE MSFVENOM COMMAND TO MAKE THE PAYLOAD TO THE STAGE ONE SCRIPT
+                sessionData['PAYLOAD']['FILENAME'] =    '-'.join(sessionData['PAYLOAD']['NAME'].split('/')) + \
+                                                        '-' + 'x'.join(host['IP_ADDRESS'].split('.')) + \
+                                                        '-' + str(sessionData['PAYLOAD']['PRIMARY_PORT'])
+                sessionData['PAYLOAD']['VENOM_CMD'] =  apt_shared.makeVenomCmd(host, 
+                                                                               sessionData, 
+                                                                               portNum, 
+                                                                               configData['LOG_FILE'])
+                #ADD VENOM COMMAND TO THE SCRIPT CONTENT
+                stageOneContent = stageOneContent + sessionData['PAYLOAD']['VENOM_CMD'] + '\n'
+                stageOneContent = stageOneContent + 'mv ' + sessionData['PAYLOAD']['FILENAME'] + \
+                                            ' ./test_payloads/' + sessionData['PAYLOAD']['FILENAME'] + '\n'
+                sessionData['RC_IN_SCRIPT_NAME'] = "test_rc/" + sessionData['PAYLOAD']['FILENAME'].split('.')[0]+'.rc'
+            else:
+                sessionData['RC_IN_SCRIPT_NAME'] = "test_rc/" + '-'.join(sessionData['PAYLOAD']['NAME'].split('/')) + '_' + \
+                                                    host['IP_ADDRESS'] + '_' + str(sessionData['PAYLOAD']['PRIMARY_PORT']) + '.rc'
+            sessionData['RC_OUT_SCRIPT_NAME'] = sessionData['RC_IN_SCRIPT_NAME'] + '.out'
+            rcScriptContent = apt_shared.makeRcScript(configData['COMMAND_LIST'],
+                                                      host, 
+                                                      sessionData, 
+                                                      configData['LOG_FILE'])
+            stageOneContent = stageOneContent + rcScriptContent + '\n'
+            if 'bind' in sessionData['PAYLOAD']['NAME'].lower() and sessionData['EXPLOIT']['NAME'].lower() == 'exploit/multi/handler':
+                launchBind = './msfconsole -qr '+ sessionData['RC_IN_SCRIPT_NAME'] + ' > ' + sessionData['RC_OUT_SCRIPT_NAME'] + ' &\n'                    
+                sessionData['MSF_HOST']['STAGE_THREE_SCRIPT'] = sessionData['MSF_HOST']['STAGE_THREE_SCRIPT'] + launchBind
+            else:
+                stageOneContent = stageOneContent + './msfconsole -qr '+ \
+                                    sessionData['RC_IN_SCRIPT_NAME'] + ' > ' + sessionData['RC_OUT_SCRIPT_NAME'] + ' &\n'
+            sessionData['MSF_HOST']['STAGE_ONE_SCRIPT'] = sessionData['MSF_HOST']['STAGE_ONE_SCRIPT'] + stageOneContent
+            logMsg(configData['LOG_FILE'], "sessionData ID: " + str(id(sessionData)))
+            logMsg(configData['LOG_FILE'], "PAYLOAD ID:     " + str(id(sessionData['PAYLOAD'])))
+            logMsg(configData['LOG_FILE'], "PAYLOAD:        " + str(sessionData['PAYLOAD']['NAME']))
+            logMsg(configData['LOG_FILE'], "EXPLOIT:        " + str(sessionData['EXPLOIT']['NAME']))
+            logMsg(configData['LOG_FILE'], "PRIMARY_PORT:   " + str(sessionData['PAYLOAD']['PRIMARY_PORT']))
+            logMsg(configData['LOG_FILE'], "MSF_HOST:       " + str(sessionData['MSF_HOST']['NAME']))
+            logMsg(configData['LOG_FILE'], "MSF_IP:         " + str(sessionData['MSF_HOST']['IP_ADDRESS']))
+            logMsg(configData['LOG_FILE'], "=============================================================================")
+    
+            for host in configData['TARGETS']:
+                logMsg(configData['LOG_FILE'], "=============================================================================")
+                logMsg(configData['LOG_FILE'], host['NAME'])
+                logMsg(configData['LOG_FILE'], "=============================================================================")
+                try:
+                    for sessionData in host['SESSION_DATASETS']:
+                        logMsg(configData['LOG_FILE'], "sessionData ID: " + str(id(sessionData)))
+                        logMsg(configData['LOG_FILE'], "PAYLOAD ID:     " + str(id(sessionData['PAYLOAD'])))
+                        logMsg(configData['LOG_FILE'], "PAYLOAD:        " + str(sessionData['PAYLOAD']['NAME']))
+                        logMsg(configData['LOG_FILE'], "EXPLOIT:        " + str(sessionData['EXPLOIT']['NAME']))
+                        logMsg(configData['LOG_FILE'], "PRIMARY_PORT:   " + str(sessionData['PAYLOAD']['PRIMARY_PORT']))
+                        logMsg(configData['LOG_FILE'], "MSF_HOST:       " + str(sessionData['MSF_HOST']['NAME']))
+                        logMsg(configData['LOG_FILE'], "MSF_IP:         " + str(sessionData['MSF_HOST']['IP_ADDRESS']))
+                        logMsg(configData['LOG_FILE'], "=============================================================================")
+                except:
+                    pass
+
+    for host in configData['TARGETS']:
+        logMsg(configData['LOG_FILE'], "=============================================================================")
+        logMsg(configData['LOG_FILE'], host['NAME'])
+        logMsg(configData['LOG_FILE'], "=============================================================================")
+        try:
+            for sessionData in host['SESSION_DATASETS']:
+                logMsg(configData['LOG_FILE'], "sessionData ID: " + str(id(sessionData)))
+                logMsg(configData['LOG_FILE'], "PAYLOAD ID:     " + str(id(sessionData['PAYLOAD'])))
+                logMsg(configData['LOG_FILE'], "PAYLOAD:        " + str(sessionData['PAYLOAD']['NAME']))
+                logMsg(configData['LOG_FILE'], "EXPLOIT:        " + str(sessionData['EXPLOIT']['NAME']))
+                logMsg(configData['LOG_FILE'], "PRIMARY_PORT:   " + str(sessionData['PAYLOAD']['PRIMARY_PORT']))
+                logMsg(configData['LOG_FILE'], "MSF_HOST:       " + str(sessionData['MSF_HOST']['NAME']))
+                logMsg(configData['LOG_FILE'], "MSF_IP:         " + str(sessionData['MSF_HOST']['IP_ADDRESS']))
+                logMsg(configData['LOG_FILE'], "=============================================================================")
+        except:
+            pass
+    """
+    ONCE ALL THE RC AND VENOM STUFF IS IN THE STAGE ONE SCRIPT, ADD THE COMMAND TO 
+    START AN HTTP SERVER TO SERVE THE PAYLOADS, THE WRITE THE SCRIPT TO A LOCAL FILE, 
+    UPLOAD IT, AND RUN IT ON THE MSF_HOST
+    """
+    for msfHost in configData['MSF_HOSTS']:
+        msfHost['STAGE_ONE_SCRIPT'] = msfHost['STAGE_ONE_SCRIPT'] + "cd " + "./test_payloads/" + "\n"
+        msfHost['STAGE_ONE_SCRIPT'] = msfHost['STAGE_ONE_SCRIPT'] + "python -m SimpleHTTPServer " + str(configData['HTTP_PORT']) + " &\n"
+        try:
+            fileObj = open(msfHost['STAGE_ONE_FILENAME'], 'wb')
+            fileObj.write(msfHost['STAGE_ONE_SCRIPT'])
+            fileObj.close()
+        except IOError as e:
+            logMsg(configData['LOG_FILE'], "[ERROR] FAILED TO WRITE TO FILE " + msfHost['STAGE_ONE_FILENAME'] + str(e))
+            bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
+        remoteStageOneScriptName = msfHost['MSF_PATH'] + '/stageOneScript.sh'
+        msfHost['VM_OBJECT'].uploadAndRun(msfHost['STAGE_ONE_FILENAME'], remoteStageOneScriptName)
+    
+    
+    
+    
+    
+    """
+    WAIT FOR THE STAGE ONE SCRIPT TO FINISH....
+    """
+    logMsg(configData['LOG_FILE'], "WAITING FOR PAYLOADS TO GENERATE...")
+    modCounter = 0
+    msfDone = False
+    try:
+        while msfDone == False:
+            modCounter = modCounter + 1
+            for msfHost in configData['MSF_HOSTS']:
+                msfHost['VM_OBJECT'].updateProcList()
+                msfDone = True
+                for procEntry in msfHost['VM_OBJECT'].procList:
+                    if remoteStageOneScriptName in procEntry:
+                        msfDone = False
+                        time.sleep(1)
+                        if modCounter % 10 == 0:
+                            logMsg(configData['LOG_FILE'], "PAYLOAD CREATION SCRIPT STILL RUNNING ON " + msfHost['NAME'])
+                            logMsg(configData['LOG_FILE'], str(procEntry))
+            if msfDone ==True:
+                logMsg(configData['LOG_FILE'], "PAYLOAD CREATION SCRIPT DONE RUNNING ON " + msfHost['NAME'])
+    except KeyboardInterrupt:
+        print "CAUGHT KEYBOARD INTERRUPT; ABORTING TEST AND RESETTING VMS...."
+        bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
+        
+    try:
+        fileObj = open(configData['REPORT_DIR'] + '/' + "test.json", 'w')
+        json.dump(configData, fileObj)
+        fileObj.close()
+    except:
+        print "FAILED TO OPEN JSON FILE...."
+        
+    """
+    MAKE PYTHON AND/OR BASH(ISH) STAGE TWO SCRIPTS TO DOWNLOAD AND START PAYLOADS ON TARGET VMs
     """
     remoteInterpreter =     None
-    for vm in testVms:
-        if 'windows' in vm.vmOS.lower():
-            remoteScriptName =  testConfig['WIN_PAYLOAD_DIRECTORY'] + "\\" + testVmScriptName + ".py"
-            localScriptName =   testConfig['SCRIPT_DIR'] + "/" + testConfig['TEST_SCRIPT'] + ".py"
-            remoteInterpreter = testConfig['PYTHON_PATH']
-        else:
-            remoteScriptName =  testConfig['NIX_PAYLOAD_DIRECTORY'] + "/" + testVmScriptName + ".sh"
-            localScriptName =   testConfig['SCRIPT_DIR'] + "/" + testConfig['TEST_SCRIPT'] + ".sh"
-            remoteInterpreter = None
-        apt_shared.makeShTestVmScript(devVm.getVmIp(), 
-                                      msfPath, 
-                                      vm, 
-                                      localScriptName, 
-                                      testConfig)
-        if not vm.uploadAndRun(localScriptName, remoteScriptName, remoteInterpreter):
-            logMsg(logFile, "[FATAL ERROR]: FAILED TO UPLOAD/EXECUTE " + localScriptName + " ON " + vm.vmName)
-            bailSafely(testVms, devVm)
-    sleepTime = 15
-    sleepGap = 7
-    for i in payloadTypeList:
-        if 'reverse' in i.lower():
-            sleepTime = sleepTime + sleepGap
-    logMsg(logFile, "WAITING " + str(sleepTime) + " SECONDS FOR BIND PAYLOAD LISTENERS TO LAUNCH")
-    time.sleep(sleepTime)
+    for target in configData['TARGETS']:
+        logMsg(configData['LOG_FILE'], "PROCESSING " + target['NAME'])
+        if target['METHOD'] == 'VM_TOOLS_UPLOAD':
+            escapedIp = 'x'.join(target['IP_ADDRESS'].split('.'))
+            logMsg(configData['LOG_FILE'], "I THINK " + target['NAME'] + " HAS IP ADDRESS " + target['IP_ADDRESS'])
+            if 'windows' in target['NAME'].lower():
+                target['STAGE_TWO_FILENAME'] = "stageTwoScript_" +  escapedIp + ".py"
+                remoteScriptName =  target['PAYLOAD_DIRECTORY'] + "\\" + target['STAGE_TWO_FILENAME']
+                localScriptName =   configData['SCRIPT_DIR'] + "/" + target['STAGE_TWO_FILENAME']
+                remoteInterpreter = target['PYTHON_PATH']
+                target['STAGE_TWO_SCRIPT'] = target['STAGE_TWO_SCRIPT'] + apt_shared.makeStageTwoPyScript(target, configData['HTTP_PORT'])
+            else:
+                target['STAGE_TWO_FILENAME'] = configData['SCRIPT_DIR'] + '/' + "stageTwoScript_" +  escapedIp + ".sh"
+                remoteScriptName =  target['PAYLOAD_DIRECTORY'] + "/" + target['STAGE_TWO_FILENAME']
+                localScriptName =   configData['SCRIPT_DIR'] + "/" + target['STAGE_TWO_FILENAME']
+                remoteInterpreter = None
+                target['STAGE_TWO_SCRIPT'] = target['STAGE_TWO_SCRIPT'] + apt_shared.makeStageTwoShScript(target, configData['HTTP_PORT'])
+            localScriptName =   configData['SCRIPT_DIR'] + "/" + target['STAGE_TWO_FILENAME']
+            try:
+                fileObj = open(localScriptName, 'wb')
+                fileObj.write(target['STAGE_TWO_SCRIPT'])
+                fileObj.close()
+            except IOError as e:
+                logMsg(configData['LOG_FILE'], "[ERROR] FAILED TO WRITE TO FILE " + localScriptName + str(e))
+                bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
+            if not target['VM_OBJECT'].uploadAndRun(localScriptName, remoteScriptName, remoteInterpreter):
+                logMsg(configData['LOG_FILE'], "[FATAL ERROR]: FAILED TO UPLOAD/EXECUTE " + localScriptName + " ON " + target['VM_OBJECT'].vmName)
+                bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
+        #####  ADD OTHER OPTIONS AS THEY BECOME USED..... THINKING MAYBE SCP_UPLOAD?
 
+    """
+    WAIT FOR REMOTE SCRIPTS TO FINISH
+    """
+    # HMMMMMMMMM, WELL, WHICH TARGET HAS THE MOST PAYLAODS TO RUN?
+    maxPayloads = 0
+    for target in configData['TARGETS']:
+        if 'upload' in target['METHOD'].lower():    #I ONLY CARE ABOUT UPLOADS
+            if maxPayloads < len(target['PAYLOADS']):
+                maxPayloads = len(target['PAYLOADS'])
+    timeToSleep = 15 + 5 * maxPayloads
+    logMsg(configData['LOG_FILE'], "WAITING " + str(timeToSleep) + " SECONDS FOR STAGE TWO SCRIPT TO FINISH")
+    time.sleep(timeToSleep)
+    logMsg(configData['LOG_FILE'], "WAKING UP")
     
     """
-    MAKE BASH SCRIPT TO RUN BIND HANDLERS ON THE DEV VM
+    MAKE STAGE THREE SCRIPT TO RUN BIND HANDLERS ON MSF HOSTS
     """
-    localScriptName = testConfig['SCRIPT_DIR'] + "/" + bindLaunchScript
-    remoteScriptName = msfPath + bindLaunchScript
-    apt_shared.makeBindLaunchScript(devVm.vmIp, msfPath, testVms, httpPort, localScriptName)
-    if not devVm.uploadAndRun(localScriptName, remoteScriptName):
-        logMsg(logFile, "[FATAL ERROR]: FAILED TO UPLOAD/EXECUTE " + localScriptName + " TO " + devVm)
-        bailSafely(testVms, devVm)
+    for msfHost in configData['MSF_HOSTS']:
+        localScriptName = configData['SCRIPT_DIR'] + "/stageThree_" + '-'.join(msfHost['IP_ADDRESS'].split('.')) + ".sh"
+        try:
+            fileObj = open(localScriptName, 'wb')
+            fileObj.write(msfHost['STAGE_THREE_SCRIPT'])
+            fileObj.close()
+        except IOError as e:
+            logMsg(configData['LOG_FILE'], "[ERROR] FAILED TO OPEN FILE " + localScriptName + '\n' + str(e))
+            bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
+        remoteScriptName = msfHost['MSF_PATH'] + "/stageThree.sh"
+        remoteInterpreter = None
+        if not msfHost['VM_OBJECT'].uploadAndRun(localScriptName, remoteScriptName, remoteInterpreter):
+            logMsg(configData['LOG_FILE'], "[FATAL ERROR]: FAILED TO UPLOAD/EXECUTE " + localScriptName + " ON " + msfHost['VM_OBJECT'].vmName)
+            bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
     
     """
-    WAIT FOR THE msfconsole PROCESSES TO FINISH
+    WAIT FOR THE METERPRETER SESSIONS TO FINISH....
     """
-    logMsg(logFile, "WAITING FOR METERPRETER PROCESSES TO FINISH")
-    pollingGap = 10
-    pollingTimes = 10 + (len(testVms) * len(payloadTypeList))
+    logMsg(configData['LOG_FILE'], "WAITING FOR MSFCONSOLE TO FINISH...")
+    time.sleep(10)
+    modCounter = 0
+    msfDone = False
+    loopCounter = 0
+    msfConsoleCount = 1
+    maxLoops = sessionCounter * 5
     try:
-        for i in range(pollingTimes):
-            msfconsoleCount = 0
-            time.sleep(pollingGap)
-            devVm.updateProcList()
-            for j in devVm.procList:
-                if 'msfconsole' in j.lower():
-                    logMsg(logFile, j)
-                    msfconsoleCount = msfconsoleCount + 1
-            msgOut = str(msfconsoleCount) + \
-                     " msfconsole PROCESSES RUNNING; ABORTING IN " + \
-                     str(pollingGap * (pollingTimes - i)) + " SECONDS."
-            logMsg(logFile, msgOut)
-            if 0 == msfconsoleCount:
+        while msfConsoleCount != 0:
+            msfConsoleCount = 0
+            for msfHost in configData['MSF_HOSTS']:
+                msfHost['VM_OBJECT'].updateProcList()
+                msfDone = True
+                msfConsoleCount = 0
+                for procEntry in msfHost['VM_OBJECT'].procList:
+                    if 'msfconsole' in procEntry:
+                        msfConsoleCount = msfConsoleCount + 1
+                time.sleep(1)
+                
+                if modCounter % 10 == 0:
+                    logMsg(configData['LOG_FILE'], str(msfConsoleCount) + " msfconsole PROCESSES STILL RUNNING ON " + msfHost['NAME'])
+            if msfDone ==True:
+                logMsg(configData['LOG_FILE'], "msfconsole DONE RUNNING ON " + msfHost['NAME'])
+            loopCounter = loopCounter + 1
+            logMsg(configData['LOG_FILE'], str(maxLoops-loopCounter) + " LOOPS REMAINING BEFORE AUTOMATIC EXIT")
+            if maxLoops<loopCounter:
                 break
     except KeyboardInterrupt:
-        print "CAUGHT KEYBOARD INTERRUPT; SKIPPING WAIT...."
-
+        print "CAUGHT KEYBOARD INTERRUPT; SKIPPING THE WAIT...."
+        
     """
     PULL REPORT FILES FROM EACH TEST VM
     """
-    logMsg(logFile, "GETTING REPORT FILES FROM VMS")
-    reportFiles = []
-    for i in testVms:
-        for j in i.payloadList:
-            srcFile = msfPath + "/" + j.rcScriptName + ".out"
-            dstFile = testConfig['SESSION_DIR'] + "/" + j.rcScriptName + ".out"
-            devVm.getFileFromGuest(srcFile, dstFile)
-            reportFiles.append(dstFile)
-    logMsg(logFile, "FINISHED DOWNLOADING VM REPORTS")
+    for target in configData['TARGETS']:
+        for sessionData in target['SESSION_DATASETS']:
+            msfPath = sessionData['MSF_HOST']['MSF_PATH']
+            remoteFileName = msfPath + '/' + sessionData['RC_OUT_SCRIPT_NAME']
+            logMsg(configData['LOG_FILE'], "RC_OUT_SCRIPT_NAME = " + str(sessionData['RC_OUT_SCRIPT_NAME']))
+            logMsg(configData['LOG_FILE'], "SESSION_DIR = " + configData['SESSION_DIR'])
+            logMsg(configData['LOG_FILE'], "RC_OUT_SCRIPT_NAME = " + str(sessionData['RC_OUT_SCRIPT_NAME'].split('/')[1]))
+            localFileName = configData['SESSION_DIR'] + '/' + str(sessionData['RC_OUT_SCRIPT_NAME'].split('/')[1])
+            sessionData['LOCAL_SESSION_FILE'] = localFileName
+            logMsg(configData['LOG_FILE'], "SAVING " + target['NAME'] + ":" + remoteFileName + " AS " + localFileName)
+            if not sessionData['MSF_HOST']['VM_OBJECT'].getFileFromGuest(remoteFileName, localFileName):
+                logMsg(configData['LOG_FILE'], "FAILED TO SAVE " + target['NAME'] + ":" + remoteFileName + " AS " + localFileName)
+                #bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
+            remoteFileName = msfPath + '/' + sessionData['RC_IN_SCRIPT_NAME']
+            localFileName = configData['SESSION_DIR'] + '/' + str(sessionData['RC_IN_SCRIPT_NAME'].split('/')[1])
+            if not sessionData['MSF_HOST']['VM_OBJECT'].getFileFromGuest(remoteFileName, localFileName):
+                logMsg(configData['LOG_FILE'], "FAILED TO SAVE " + target['NAME'] + ":" + remoteFileName + " AS " + localFileName)
+                #bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
+    logMsg(configData['LOG_FILE'], "FINISHED DOWNLOADING REPORTS")
     
     """
     GET COMMIT VERSION
     """
-    srcFile = remoteCommitFile
-    dstFile = testConfig['REPORT_DIR'] + "/commit_" + testConfig['TIMESTAMP'] + ".txt"
-    devVm.getFileFromGuest(srcFile, dstFile)
-    try:
-        fileObj = open(dstFile, 'r')
-        commitRaw = fileObj.read().strip()
-        fileObj.close()
-    except IOError as e:
-        logMsg(logFile, "FAILED TO OPEN " + dstFile)
-        logMsg(logFile, "SYSTEM ERROR: \n" + str(e))
-    else:
-        commitVersion = commitRaw.split(' ')[1]
-        logMsg(logFile, "COMMIT VERSION OF metasploit-framework: " + commitVersion)
+    for msfHost in configData['MSF_HOSTS']:
+        srcFile = msfHost['COMMIT_FILE']
+        dstFile = configData['REPORT_DIR'] + "/commit_" + '-'.join(msfHost['IP_ADDRESS'].split('.')) + ".txt"
+        msfHost['VM_OBJECT'].getFileFromGuest(srcFile, dstFile)
+        try:
+            fileObj = open(dstFile, 'r')
+            commitRaw = fileObj.read().strip()
+            fileObj.close()
+        except IOError as e:
+            logMsg(logFile, "FAILED TO OPEN " + dstFile)
+            logMsg(logFile, "SYSTEM ERROR: \n" + str(e))
+        else:
+            msfHost['COMMIT_VERSION'] = commitRaw.split(' ')[1]
+            logMsg(configData['LOG_FILE'], "COMMIT VERSION OF metasploit-framework on " + msfHost['NAME'] + ": " + msfHost['COMMIT_VERSION'])
     
     """
     RETURN ALL TESTING VMS TO TESTING_BASE
     RETURN DEV VM TO WHERE WE FOUND IT
     POWER OFF ALL VMS
     """
-    devVm.revertDevVm()
-    devVm.powerOff()
-    for i in testVms:
-        i.revertToTestingBase()
-        i.powerOff()
+    for msfHost in configData['MSF_HOSTS']:
+        if msfHost['TYPE'] == 'VIRTUAL':
+            msfHost['VM_OBJECT'].revertMsfVm()
+            msfHost['VM_OBJECT'].powerOff()
+    for target in configData['TARGETS']:
+        if target['TYPE'] == 'VIRTUAL':
+            logMsg(configData['LOG_FILE'], "REVERTING " + target['NAME'])
+            target['VM_OBJECT'].revertToTestingBase()
+            target['VM_OBJECT'].powerOff()
 
     """
     COALLATE DATA
     """
-    resultDict = apt_shared.populateResults(reportFiles, testVms, testConfig)
-
-    """
-    GENERATING REPORT
-    """
-    logMsg(logFile, "GENERATING MAIN REPORT")
-    reportFileName = testConfig['REPORT_DIR'] + "/" + reportPrefix
-    with open(reportFileName + ".json", 'wb') as jsonFile:
-        json.dump(resultDict, jsonFile) 
-    reportFile = apt_shared.generateReport(reportFiles, testVms, reportFileName + ".txt", testConfig['SESSION_DIR'], commitVersion)
-    logMsg(logFile, "REPORT GENERATION COMPLETE, REPORT FILE: " + reportFile)
-    apt_shared.makeWebResults(testVms, reportFileName + ".old.html")
-    if not apt_shared.generateHtmlReport(resultDict, reportFileName + ".html", testVms, commitVersion, testConfig):
-        logMsg(logFile, "FAILED TO GENERATE HTML REPORT")
-    else:
-        logMsg(logFile, "HTML REPORT AVAILABLE HERE: " + reportFileName + ".html")
-
-    logMsg(logFile, "WAITING FOR ALL TASKS TO COMPLETE")
+    for target in configData['TARGETS']:
+        logMsg(configData['LOG_FILE'], "CHECKING " + target['NAME'])
+        for sessionData in target['SESSION_DATASETS']:
+            logMsg(configData['LOG_FILE'], "CHECKING " + sessionData['EXPLOIT']['NAME'] + ":" + sessionData['PAYLOAD']['NAME'])
+            statusFlag = True
+            try:
+                fileObj = open(sessionData['LOCAL_SESSION_FILE'], 'r')
+                fileContents = fileObj.read()
+                fileObj.close()
+            except IOError as e:
+                logMsg(configData['LOG_FILE'], "FAILED TO OPEN LOCAL REPORT FILE: " + sessionData['LOCAL_SESSION_FILE'])
+                continue
+            for item in target['SUCCESS_LIST']:
+                if item not in fileContents:
+                    logMsg(configData['LOG_FILE'], str(item))
+                    statusFlag = False
+            sessionData['STATUS'] = statusFlag
+            if statusFlag:
+                logMsg(configData['LOG_FILE'], sessionData['LOCAL_SESSION_FILE'])
+                logMsg(configData['LOG_FILE'], "TEST PASSED: " + \
+                       target['NAME'] + ':' + \
+                       sessionData['PAYLOAD']['NAME'] + ":" + \
+                       sessionData['EXPLOIT']['NAME'] + ":" + \
+                       str(sessionData['PAYLOAD']['PRIMARY_PORT']))
+            else:
+                logMsg(configData['LOG_FILE'], sessionData['LOCAL_SESSION_FILE'])
+                logMsg(configData['LOG_FILE'], "TEST FAILED: " + \
+                        target['NAME'] + ':' + \
+                        sessionData['PAYLOAD']['NAME'] + ":" + \
+                       sessionData['EXPLOIT']['NAME'] + ":" + \
+                       str(sessionData['PAYLOAD']['PRIMARY_PORT']))
+    
+    htmlReportString = apt_shared.makeHtmlReport(configData['TARGETS'], configData['MSF_HOSTS'])
+    htmlFileName = configData['REPORT_DIR'] + "/" + configData['REPORT_PREFIX'] + ".html"
+    try:
+        fileObj = open(htmlFileName, 'wb')
+        fileObj.write(htmlReportString)
+        fileObj.close()
+    except IOError as e:
+        logMsg(logFile, "FAILED TO OPEN " + htmlFileName)
+        logMsg(logFile, "SYSTEM ERROR: \n" + str(e))
+    logMsg(configData['LOG_FILE'], "WAITING FOR ALL TASKS TO COMPLETE")
     time.sleep(5)
-    logMsg(logFile, "EXIT")
+    logMsg(configData['LOG_FILE'], "EXIT")
     
 if __name__ == "__main__":
     main()

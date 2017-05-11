@@ -1,5 +1,4 @@
 import sys
-from samba.dcerpc.dcerpc import DCERPC_NCACN_PAYLOAD_OFFSET
 sys.path.insert(0, '../vm-automation')
 
 import workstationVm
@@ -13,7 +12,7 @@ import os
 import json
     
 def bailSafely(targets, msfHosts):
-    print "AN ERROR HAPPENED; RETURNING VMS TO THIER FULL UPRIGHT AND LOCKED POSITIONS"
+    print "AN ERROR HAPPENED; RETURNING VMS TO THEIR FULL UPRIGHT AND LOCKED POSITIONS"
     timeToWait = 10
     for i in range(timeToWait):
         print "SLEEPING FOR " + str(timeToWait-i) + " SECOND(S); EXIT NOW TO PRESERVE VMS!"
@@ -301,9 +300,6 @@ def main():
         if 'PAYLOADS' in configData:
             for payload in configData['PAYLOADS']:
                 #REPLACE THE STRING 'UNIQUE_PORT' WITH AN ACTUAL UNIQUE PORT
-                for settingItem in payload['SETTINGS']:
-                    while "UNIQUE_PORT" in settingItem:
-                        settingItem = settingItem.replace("UNIQUE_PORT", str(portNum.get()), 1)
                 if 'x64' not in target['NAME'].lower() and 'x64' in payload['NAME'].lower():
                     #MISMATCHED ARCH; BAIL
                     continue
@@ -314,13 +310,11 @@ def main():
                     #ONLY USE WIN PAYLOADS ON WIN
                     continue
                 else:
+                    logMsg(configData['LOG_FILE'], "ADDING " + str(payload))
                     target['PAYLOADS'].append(payload.copy())
         if 'EXPLOITS' in configData:
             for exploit in configData['EXPLOITS']:
                 #REPLACE THE STRING 'UNIQUE_PORT' WITH AN ACTUAL UNIQUE PORT
-                for settingItem in exploit['SETTINGS']:
-                    while "UNIQUE_PORT" in settingItem:
-                        settingItem = settingItem.replace("UNIQUE_PORT", str(portNum.get()), 1)
                 if 'exploit/multi/handler' == exploit['NAME'].lower() and 'upload' in target['METHOD']:
                     continue
                 if 'x64' not in target['NAME'].lower() and 'x64' in exploit['NAME'].lower():
@@ -333,15 +327,52 @@ def main():
                     #ONLY USE WIN PAYLOADS ON WIN
                     continue
                 if exploit['NAME'] in target['EXPLOITS']:
+                    logMsg(configData['LOG_FILE'], "ADDING " + str(exploit))
                     continue
                 else:
-                    target['EXPLOITS'].append(exploit)
-    
+                    target['EXPLOITS'].append(exploit.copy())
+    for target in configData['TARGETS']:
+        logMsg(configData['LOG_FILE'], "PAYLOADS = " + str(target['PAYLOADS']))
+        logMsg(configData['LOG_FILE'], "EXPLOITS = " + str(target['EXPLOITS']))
+        for payload in target['PAYLOADS']:
+            logMsg(configData['LOG_FILE'], str(payload))
+            #REPLACE THE STRING 'UNIQUE_PORT' WITH AN ACTUAL UNIQUE PORT
+            for settingItem in payload['SETTINGS']:
+                logMsg(configData['LOG_FILE'], "SETTING ITEM= " + settingItem + str(id(settingItem)))
+                if 'UNIQUE_PORT' in settingItem:
+                    logMsg(configData['LOG_FILE'], "UNIQUE PORT IN SETTING ITEM")
+                while "UNIQUE_PORT" in settingItem:
+                    settingItem = settingItem.replace("UNIQUE_PORT", str(portNum.get()), 1)
+                logMsg(configData['LOG_FILE'], "SETTING ITEM= " + settingItem + str(id(settingItem)))
+                if 'UNIQUE_PORT' in settingItem:
+                    logMsg(configData['LOG_FILE'], "FAILED TO CHANGE UNIQUE PORT")
+        for exploit in target['EXPLOITS']:
+            logMsg(configData['LOG_FILE'], str(exploit))
+            #REPLACE THE STRING 'UNIQUE_PORT' WITH AN ACTUAL UNIQUE PORT
+            for index in range(len(exploit['SETTINGS'])):
+                logMsg(configData['LOG_FILE'], "SETTING ITEM= " + exploit['SETTINGS'][index] + str(id(exploit['SETTINGS'][index])))
+                if 'UNIQUE_PORT' in exploit['SETTINGS'][index]:
+                    logMsg(configData['LOG_FILE'], "UNIQUE PORT IN SETTING ITEM")
+                while "UNIQUE_PORT" in exploit['SETTINGS'][index]:
+                    exploit['SETTINGS'][index] = exploit['SETTINGS'][index].replace("UNIQUE_PORT", str(portNum.get()), 1)
+                logMsg(configData['LOG_FILE'], "SETTING ITEM= " + exploit['SETTINGS'][index] + str(id(exploit['SETTINGS'][index])))
+
+    for target in configData['TARGETS']:
+        logMsg(configData['LOG_FILE'], "PAYLOADS = " + str(target['PAYLOADS']))
+        logMsg(configData['LOG_FILE'], "EXPLOITS = " + str(target['EXPLOITS']))
+        for payload in target['PAYLOADS']:
+            for settingItem in payload['SETTINGS']:
+                logMsg(configData['LOG_FILE'], str(settingItem) + "_" + str(id(settingItem)))
+        for exploit in target['EXPLOITS']:
+            for settingItem in exploit['SETTINGS']:
+                logMsg(configData['LOG_FILE'], str(settingItem) + "_" + str(id(settingItem)))
+            #REPLACE THE STRING 'UNIQUE_PORT' WITH AN ACTUAL UNIQUE PORT
     """
     NOW EACH HOST HAS A LIST OF ALL THE EXPLOITS AND PAYLOADS IT NEEDS TO USE...... ASSEMBLE THEM TO FORM VOLTRON..... 
     I MEAN SESSION_DATA
     """
     for target in configData['TARGETS']:
+        logMsg(configData['LOG_FILE'], str(target))
         if 'EXPLOITS' not in target:
             logMsg(configData['LOG_FILE'], "CONFIG FILE DID NOT HAVE EXPLOITS LISTED FOR " + target['NAME'] + ".  NOTHING TO TEST?")
             bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
@@ -349,7 +380,9 @@ def main():
             logMsg(configData['LOG_FILE'], "CONFIG FILE DID NOT HAVE PAYLOADS LISTED FOR " + target['NAME'] + ".  NOTHING TO TEST?")
             bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
         for exploit in target['EXPLOITS']:
+            logMsg(configData['LOG_FILE'], str(exploit))
             for payload in target['PAYLOADS']:
+                logMsg(configData['LOG_FILE'], str(payload))
                 tempDic = {}
                 tempDic['EXPLOIT'] = exploit
                 tempDic['PAYLOAD'] = payload
@@ -477,7 +510,6 @@ def main():
     PREP STAGE TWO SCRIPT:
         (1) DETERMINE OS OF TARGET TO DETERMINE WHAT KIND OF SCRIPT WE NEED
         (2) ADD COMANDS TO THE STAGE TWO SCRIPT SO THE TAGETS DOWNLOAD THE PAYLOAD AND EXECUTE IT
-    (5) 
     """
     """
     THE FIRST FEW LINES OF THE STAGE ONE SCRIPT PREP THINGS
@@ -490,15 +522,17 @@ def main():
         host['STAGE_ONE_FILENAME'] = configData['SCRIPT_DIR'] + '/' + "stageOneScript_" +  str(fileId) + ".sh"
         stageOneContent = "#!/bin/bash -l \n\n"
         stageOneContent = stageOneContent + "cd " + host['MSF_PATH'] + "\n"
-        stageOneContent = stageOneContent + "mkdir test_payloads\n"
-        stageOneContent = stageOneContent + "mkdir test_rc\n"
-        stageOneContent = stageOneContent + "git fetch --all\n"
-        stageOneContent = stageOneContent + "git pull upstream master\n"
+        stageOneContent = stageOneContent + "git fetch upstream\n"
+        stageOneContent = stageOneContent + "git reset --hard FETCH_HEAD\n"
+        stageOneContent = stageOneContent + "git clean -df\n"
+        stageOneContent = stageOneContent + "git checkout upstream/master\n"
         stageOneContent = stageOneContent + "git log | head -n 1 > " + host['COMMIT_FILE'] + "\n"
         stageOneContent = stageOneContent + "gem install bundler\n"
         stageOneContent = stageOneContent + "bundle install\n"
+        stageOneContent = stageOneContent + "mkdir test_payloads\n"
+        stageOneContent = stageOneContent + "mkdir test_rc\n"
         host['STAGE_ONE_SCRIPT'] = stageOneContent
-        host['STAGE_THREE_SCRIPT'] = "cd " + host['MSF_PATH'] + "\n"
+        host['STAGE_THREE_SCRIPT'] = "#!/bin/bash -l\n\n" + "cd " + host['MSF_PATH'] + "\n"
     # MAKE THE REST OF THE STAGE ONE SCRIPT
     sleepBreak = "\nsleep(2)\n"
     sessionCounter = 0
@@ -544,12 +578,13 @@ def main():
                                                       configData['LOG_FILE'])
             stageOneContent = stageOneContent + rcScriptContent + '\n'
             if 'bind' in sessionData['PAYLOAD']['NAME'].lower() and sessionData['EXPLOIT']['NAME'].lower() == 'exploit/multi/handler':
-                launchBind = './msfconsole -qr '+ sessionData['RC_IN_SCRIPT_NAME'] + ' > ' + sessionData['RC_OUT_SCRIPT_NAME'] + ' &\n'                    
+                launchBind = './msfconsole -qr '+ sessionData['RC_IN_SCRIPT_NAME'] + ' > ' + sessionData['RC_OUT_SCRIPT_NAME'] + '&\n'
                 sessionData['MSF_HOST']['STAGE_THREE_SCRIPT'] = sessionData['MSF_HOST']['STAGE_THREE_SCRIPT'] + launchBind
             else:
                 stageOneContent = stageOneContent + './msfconsole -qr '+ \
                                     sessionData['RC_IN_SCRIPT_NAME'] + ' > ' + sessionData['RC_OUT_SCRIPT_NAME'] + ' &\n'
             sessionData['MSF_HOST']['STAGE_ONE_SCRIPT'] = sessionData['MSF_HOST']['STAGE_ONE_SCRIPT'] + stageOneContent
+            """
             logMsg(configData['LOG_FILE'], "sessionData ID: " + str(id(sessionData)))
             logMsg(configData['LOG_FILE'], "PAYLOAD ID:     " + str(id(sessionData['PAYLOAD'])))
             logMsg(configData['LOG_FILE'], "PAYLOAD:        " + str(sessionData['PAYLOAD']['NAME']))
@@ -575,6 +610,8 @@ def main():
                         logMsg(configData['LOG_FILE'], "=============================================================================")
                 except:
                     pass
+            """
+    """
 
     for host in configData['TARGETS']:
         logMsg(configData['LOG_FILE'], "=============================================================================")
@@ -593,8 +630,9 @@ def main():
         except:
             pass
     """
+    """
     ONCE ALL THE RC AND VENOM STUFF IS IN THE STAGE ONE SCRIPT, ADD THE COMMAND TO 
-    START AN HTTP SERVER TO SERVE THE PAYLOADS, THE WRITE THE SCRIPT TO A LOCAL FILE, 
+    START AN HTTP SERVER TO SERVE THE PAYLOADS, THEN WRITE THE SCRIPT TO A LOCAL FILE, 
     UPLOAD IT, AND RUN IT ON THE MSF_HOST
     """
     for msfHost in configData['MSF_HOSTS']:
@@ -610,14 +648,10 @@ def main():
         remoteStageOneScriptName = msfHost['MSF_PATH'] + '/stageOneScript.sh'
         msfHost['VM_OBJECT'].uploadAndRun(msfHost['STAGE_ONE_FILENAME'], remoteStageOneScriptName)
     
-    
-    
-    
-    
     """
     WAIT FOR THE STAGE ONE SCRIPT TO FINISH....
     """
-    logMsg(configData['LOG_FILE'], "WAITING FOR PAYLOADS TO GENERATE...")
+    logMsg(configData['LOG_FILE'], "WAITING FOR STAGE ONE SCRIPT(S) TO COMPLETE...")
     modCounter = 0
     msfDone = False
     try:
@@ -649,10 +683,12 @@ def main():
     """
     MAKE PYTHON AND/OR BASH(ISH) STAGE TWO SCRIPTS TO DOWNLOAD AND START PAYLOADS ON TARGET VMs
     """
+    stageTwoWaitNeeded = False
     remoteInterpreter =     None
     for target in configData['TARGETS']:
         logMsg(configData['LOG_FILE'], "PROCESSING " + target['NAME'])
         if target['METHOD'] == 'VM_TOOLS_UPLOAD':
+            stageTwoWaitNeeded = True
             escapedIp = 'x'.join(target['IP_ADDRESS'].split('.'))
             logMsg(configData['LOG_FILE'], "I THINK " + target['NAME'] + " HAS IP ADDRESS " + target['IP_ADDRESS'])
             if 'windows' in target['NAME'].lower():
@@ -683,16 +719,20 @@ def main():
     """
     WAIT FOR REMOTE SCRIPTS TO FINISH
     """
-    # HMMMMMMMMM, WELL, WHICH TARGET HAS THE MOST PAYLAODS TO RUN?
-    maxPayloads = 0
-    for target in configData['TARGETS']:
-        if 'upload' in target['METHOD'].lower():    #I ONLY CARE ABOUT UPLOADS
-            if maxPayloads < len(target['PAYLOADS']):
-                maxPayloads = len(target['PAYLOADS'])
-    timeToSleep = 15 + 5 * maxPayloads
-    logMsg(configData['LOG_FILE'], "WAITING " + str(timeToSleep) + " SECONDS FOR STAGE TWO SCRIPT TO FINISH")
-    time.sleep(timeToSleep)
-    logMsg(configData['LOG_FILE'], "WAKING UP")
+    # HMMMMMMMMM, WELL, WHICH TARGET HAS THE MOST PAYLOADS TO RUN?
+    if stageTwoWaitNeeded:
+        maxPayloads = 0
+        for target in configData['TARGETS']:
+            if 'upload' in target['METHOD'].lower():    #I ONLY CARE ABOUT UPLOADS
+                if maxPayloads < len(target['PAYLOADS']):
+                    maxPayloads = len(target['PAYLOADS'])
+        timeToSleep = 15 + 5 * maxPayloads
+        logMsg(configData['LOG_FILE'], "WAITING " + str(timeToSleep) + " SECONDS FOR STAGE TWO SCRIPT TO FINISH")
+        time.sleep(timeToSleep)
+        logMsg(configData['LOG_FILE'], "WAKING UP")
+    else:
+        logMsg(configData['LOG_FILE'], "NO STAGE TWO SCRIPTS UPLOADED..... NOTHING TO SEE HERE; MOVE ALONG")
+        
     
     """
     MAKE STAGE THREE SCRIPT TO RUN BIND HANDLERS ON MSF HOSTS
@@ -711,7 +751,6 @@ def main():
         if not msfHost['VM_OBJECT'].uploadAndRun(localScriptName, remoteScriptName, remoteInterpreter):
             logMsg(configData['LOG_FILE'], "[FATAL ERROR]: FAILED TO UPLOAD/EXECUTE " + localScriptName + " ON " + msfHost['VM_OBJECT'].vmName)
             bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
-    
     """
     WAIT FOR THE METERPRETER SESSIONS TO FINISH....
     """
@@ -721,7 +760,7 @@ def main():
     msfDone = False
     loopCounter = 0
     msfConsoleCount = 1
-    maxLoops = sessionCounter * 5
+    maxLoops = sessionCounter * 3 + 30
     try:
         while msfConsoleCount != 0:
             msfConsoleCount = 0
@@ -787,21 +826,6 @@ def main():
             logMsg(configData['LOG_FILE'], "COMMIT VERSION OF metasploit-framework on " + msfHost['NAME'] + ": " + msfHost['COMMIT_VERSION'])
     
     """
-    RETURN ALL TESTING VMS TO TESTING_BASE
-    RETURN DEV VM TO WHERE WE FOUND IT
-    POWER OFF ALL VMS
-    """
-    for msfHost in configData['MSF_HOSTS']:
-        if msfHost['TYPE'] == 'VIRTUAL':
-            msfHost['VM_OBJECT'].revertMsfVm()
-            msfHost['VM_OBJECT'].powerOff()
-    for target in configData['TARGETS']:
-        if target['TYPE'] == 'VIRTUAL':
-            logMsg(configData['LOG_FILE'], "REVERTING " + target['NAME'])
-            target['VM_OBJECT'].revertToTestingBase()
-            target['VM_OBJECT'].powerOff()
-
-    """
     COALLATE DATA
     """
     for target in configData['TARGETS']:
@@ -845,6 +869,21 @@ def main():
     except IOError as e:
         logMsg(logFile, "FAILED TO OPEN " + htmlFileName)
         logMsg(logFile, "SYSTEM ERROR: \n" + str(e))
+    """
+    RETURN ALL TESTING VMS TO TESTING_BASE
+    RETURN DEV VM TO WHERE WE FOUND IT
+    POWER OFF ALL VMS
+    """
+    for msfHost in configData['MSF_HOSTS']:
+        if msfHost['TYPE'] == 'VIRTUAL':
+            msfHost['VM_OBJECT'].revertMsfVm()
+            msfHost['VM_OBJECT'].powerOff()
+    for target in configData['TARGETS']:
+        if target['TYPE'] == 'VIRTUAL':
+            logMsg(configData['LOG_FILE'], "REVERTING " + target['NAME'])
+            target['VM_OBJECT'].revertToTestingBase()
+            target['VM_OBJECT'].powerOff()
+
     logMsg(configData['LOG_FILE'], "WAITING FOR ALL TASKS TO COMPLETE")
     time.sleep(5)
     logMsg(configData['LOG_FILE'], "EXIT")

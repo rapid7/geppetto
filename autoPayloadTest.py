@@ -584,52 +584,7 @@ def main():
                 stageOneContent = stageOneContent + './msfconsole -qr '+ \
                                     sessionData['RC_IN_SCRIPT_NAME'] + ' > ' + sessionData['RC_OUT_SCRIPT_NAME'] + ' &\n'
             sessionData['MSF_HOST']['STAGE_ONE_SCRIPT'] = sessionData['MSF_HOST']['STAGE_ONE_SCRIPT'] + stageOneContent
-            """
-            logMsg(configData['LOG_FILE'], "sessionData ID: " + str(id(sessionData)))
-            logMsg(configData['LOG_FILE'], "PAYLOAD ID:     " + str(id(sessionData['PAYLOAD'])))
-            logMsg(configData['LOG_FILE'], "PAYLOAD:        " + str(sessionData['PAYLOAD']['NAME']))
-            logMsg(configData['LOG_FILE'], "EXPLOIT:        " + str(sessionData['EXPLOIT']['NAME']))
-            logMsg(configData['LOG_FILE'], "PRIMARY_PORT:   " + str(sessionData['PAYLOAD']['PRIMARY_PORT']))
-            logMsg(configData['LOG_FILE'], "MSF_HOST:       " + str(sessionData['MSF_HOST']['NAME']))
-            logMsg(configData['LOG_FILE'], "MSF_IP:         " + str(sessionData['MSF_HOST']['IP_ADDRESS']))
-            logMsg(configData['LOG_FILE'], "=============================================================================")
-    
-            for host in configData['TARGETS']:
-                logMsg(configData['LOG_FILE'], "=============================================================================")
-                logMsg(configData['LOG_FILE'], host['NAME'])
-                logMsg(configData['LOG_FILE'], "=============================================================================")
-                try:
-                    for sessionData in host['SESSION_DATASETS']:
-                        logMsg(configData['LOG_FILE'], "sessionData ID: " + str(id(sessionData)))
-                        logMsg(configData['LOG_FILE'], "PAYLOAD ID:     " + str(id(sessionData['PAYLOAD'])))
-                        logMsg(configData['LOG_FILE'], "PAYLOAD:        " + str(sessionData['PAYLOAD']['NAME']))
-                        logMsg(configData['LOG_FILE'], "EXPLOIT:        " + str(sessionData['EXPLOIT']['NAME']))
-                        logMsg(configData['LOG_FILE'], "PRIMARY_PORT:   " + str(sessionData['PAYLOAD']['PRIMARY_PORT']))
-                        logMsg(configData['LOG_FILE'], "MSF_HOST:       " + str(sessionData['MSF_HOST']['NAME']))
-                        logMsg(configData['LOG_FILE'], "MSF_IP:         " + str(sessionData['MSF_HOST']['IP_ADDRESS']))
-                        logMsg(configData['LOG_FILE'], "=============================================================================")
-                except:
-                    pass
-            """
-    """
 
-    for host in configData['TARGETS']:
-        logMsg(configData['LOG_FILE'], "=============================================================================")
-        logMsg(configData['LOG_FILE'], host['NAME'])
-        logMsg(configData['LOG_FILE'], "=============================================================================")
-        try:
-            for sessionData in host['SESSION_DATASETS']:
-                logMsg(configData['LOG_FILE'], "sessionData ID: " + str(id(sessionData)))
-                logMsg(configData['LOG_FILE'], "PAYLOAD ID:     " + str(id(sessionData['PAYLOAD'])))
-                logMsg(configData['LOG_FILE'], "PAYLOAD:        " + str(sessionData['PAYLOAD']['NAME']))
-                logMsg(configData['LOG_FILE'], "EXPLOIT:        " + str(sessionData['EXPLOIT']['NAME']))
-                logMsg(configData['LOG_FILE'], "PRIMARY_PORT:   " + str(sessionData['PAYLOAD']['PRIMARY_PORT']))
-                logMsg(configData['LOG_FILE'], "MSF_HOST:       " + str(sessionData['MSF_HOST']['NAME']))
-                logMsg(configData['LOG_FILE'], "MSF_IP:         " + str(sessionData['MSF_HOST']['IP_ADDRESS']))
-                logMsg(configData['LOG_FILE'], "=============================================================================")
-        except:
-            pass
-    """
     """
     ONCE ALL THE RC AND VENOM STUFF IS IN THE STAGE ONE SCRIPT, ADD THE COMMAND TO 
     START AN HTTP SERVER TO SERVE THE PAYLOADS, THEN WRITE THE SCRIPT TO A LOCAL FILE, 

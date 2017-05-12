@@ -227,6 +227,7 @@ def makeRcScript(cmdList, targetData, sessionData, logFile):
     for settingEntry in sessionData['PAYLOAD']['SETTINGS']:
         if '=' in settingEntry:
             strSetting = "SET " + settingEntry.split('=')[0] + " " + settingEntry.split('=')[1]
+    rcScriptContent = rcScriptContent + "echo 'show options' >> " + rcScriptName + '\n'
     rcScriptContent = rcScriptContent + rubySleep
     rcScriptContent = rcScriptContent + "echo 'run -z' >> " + rcScriptName + '\n'
     rcScriptContent = rcScriptContent + "echo '<ruby>' >> " + rcScriptName + '\n'

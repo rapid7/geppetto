@@ -2,6 +2,78 @@
 ## Purpose
 The idea behind this repo is to create an automated testing framework that can test metasploit payloads and exploits against actual targets.  It takes in json config files containing target data, exploit data, and payload data, then creates bash and/or python configuration scripts for the hists and rc scripts for msfconsole sessions that it uploads and runs on host machines as-needed.  This repo was creaded originally with the expectation it would use a sister repo, vm-automation, but with increasing functinoality, the requirement that targets be virtualized is gone, and hopefully future improvements will allow the msfconsole sessions to run on physical hardware as well.
 
+### How does it work?
+Originally, this script was targeted to virtual machines and exclusively for reverse `/exploit/multi/handler` "exploits" so that's a good place to start the explination:
+To test a payload with an `exploit/multi/handler` listener, we need to create the payload on a framework VM (__MSF_HOST__), start a listener on the __MSF_HOSTS__, upload the payload to the VM we're testing (__TARGET__) and start the payload.  Once we get the callback and establish the session, we nee to execute commands (__COMMAND_LIST__) and then somehow figure out if it worked.
+That got a bit complicated when we added support for bind payloads, as it meant that slfconsole needed to get launched on after the payloads was uploaded and started on the __TARGET__.  Supporting exploits was comparatively easy, but to make some sense of how it all works, I've kind of split things into three phases:
+* Stage One: Configure __MSF_HOST__:
+  * Create the binary payload if the exploit is `exploit/multi/handler`
+  * Create an rc script to set up and start the msfconsole session
+  * If the payload is a _reverse_ payload or an rce exploit, start msfconsole with the rc script
+* Stage Two: Configure __TARGETS__:
+  * Create python or bash scripts to download `/exploit/multi/handler` payloads and launch them
+* Stage Three: Start Bind sessions on __MSF_HOSTS__
+  * If the payload is a _bind_ payload, start msfconsole with the rc script
+  
+  It is not hard to see that the only time all three stages are required are with a bind payload and a `exploit/multi/handler` "exploit."  Everything else only needs one or two of the stages, but it makes life easier for me to separate the logic into these three stages.
+  
+### What can it do now?
+Currently, the test framework _should_ support all IPv4 payloads and exploits.  IPv6 is probably achieveable with moderate difficulty, but I desperately want to avoid using IPv6 until I get a colon key on my numpad.  
+
+TBH, I've also not tested with a lot of the more complex payloads, as I've no idea what some of them do.  I have tested with the following payloads (There is some trivial cleanup required before mettle payloads are supported with `/exploit/multi/handler`):
+* `windows/meterpreter/bind_tcp`
+* `windows/meterpreter/bind_tcp_rc4`
+* `windows/meterpreter/bind_tcp_uuid`
+* `windows/meterpreter/reverse_http`
+* `windows/meterpreter/reverse_https`
+* `windows/meterpreter/reverse_tcp`
+* `windows/meterpreter/reverse_tcp_dns`
+* `windows/meterpreter/reverse_tcp_rc4`
+* `windows/meterpreter/reverse_tcp_rc4_dns`
+* `windows/meterpreter/reverse_tcp_uuid`
+* `windows/meterpreter/reverse_winhttp`
+* `windows/meterpreter/reverse_winhttps`
+* `windows/meterpreter_bind_tcp`
+* `windows/meterpreter_reverse_http`
+* `windows/meterpreter_reverse_https`
+* `windows/meterpreter_reverse_tcp`
+* `windows/x64/meterpreter/bind_tcp`
+* `windows/x64/meterpreter/bind_tcp_uuid`
+* `windows/x64/meterpreter/reverse_http`
+* `windows/x64/meterpreter/reverse_https`
+* `windows/x64/meterpreter/reverse_tcp`
+* `windows/x64/meterpreter/reverse_tcp_uuid`
+* `windows/x64/meterpreter/reverse_winhttp`
+* `windows/x64/meterpreter/reverse_winhttps`
+* `windows/x64/meterpreter_bind_tcp`
+* `windows/x64/meterpreter_reverse_http`
+* `windows/x64/meterpreter_reverse_https`
+* `windows/x64/meterpreter_reverse_tcp`
+* `linux/mipsle/meterpreter/reverse_tcp`
+* `linux/x64/meterpreter/bind_tcp`
+* `linux/x64/meterpreter/reverse_tcp`
+* `linux/x86/meterpreter/bind_tcp`
+* `linux/x86/meterpreter/bind_tcp_uuid`
+* `linux/x86/meterpreter/reverse_tcp`
+* `linux/x86/meterpreter/reverse_tcp_uuid`
+* `java/meterpreter/bind_tcp`
+* `java/meterpreter/reverse_http`
+* `java/meterpreter/reverse_https`
+* `java/meterpreter/reverse_tcp`
+* `python/meterpreter/bind_tcp`
+* `python/meterpreter/bind_tcp_uuid`
+* `python/meterpreter/reverse_http`
+* `python/meterpreter/reverse_https`
+* `python/meterpreter/reverse_tcp`
+* `python/meterpreter/reverse_tcp_ssl`
+* `python/meterpreter/reverse_tcp_uuid`
+* `python/meterpreter_bind_tcp`
+* `python/meterpreter_reverse_http`
+* `python/meterpreter_reverse_https`
+* `python/meterpreter_reverse_tcp`
+
+
+  
 ### json config files
 Here are the values found in the json config files:
 * __TEST_NAME__: This is just the name for the test.  It can be whatever you want it to be, and only appears inside the reports generated by the scripts.
@@ -59,4 +131,5 @@ Within that directory, there will be three directories:
   * <reportname>.html will be a really simple html document that lists TARGET, MSF_HOST, PAYLOAD, EXPLOIT, and success, with a link to the text of the session that was (hopefully) generated.
 * `scripts` contains the scripts generated to support the tests and kept to aid debugging.
 * `sessions` contains the rc scripts sent to Framework and the text of the session (hopefully) generated.  The sessions are linked from the report.html file.
+
 

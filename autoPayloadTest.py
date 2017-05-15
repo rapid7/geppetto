@@ -138,6 +138,7 @@ def parseTestConfig(configFile):
     configPassed = True
     requiredList = []
     requiredList.append("TEST_NAME")
+    requiredList.append("GIT_BRANCH")
     requiredList.append("REPORT_PREFIX")
     requiredList.append("HTTP_PORT")
     requiredList.append("STARTING_LISTENER")
@@ -525,7 +526,8 @@ def main():
         stageOneContent = stageOneContent + "git fetch upstream\n"
         stageOneContent = stageOneContent + "git reset --hard FETCH_HEAD\n"
         stageOneContent = stageOneContent + "git clean -df\n"
-        stageOneContent = stageOneContent + "git checkout upstream/master\n"
+        stageOneContent = stageOneContent + "git checkout " + configData['GIT_BRANCH'] + "\n"
+#        stageOneContent = stageOneContent + "git checkout upstream/master\n"
         stageOneContent = stageOneContent + "git log | head -n 1 > " + host['COMMIT_FILE'] + "\n"
         stageOneContent = stageOneContent + "gem install bundler\n"
         stageOneContent = stageOneContent + "bundle install\n"

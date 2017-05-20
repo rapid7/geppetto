@@ -82,7 +82,9 @@ def expandGlobalList(hostList, globalList, listName):
             target[listName] = []
         for listItem in globalList:
             target[listName].append(listItem)
-            
+
+def getTimestamp():
+    return str(time.time()).split('.')[0]
 def instantiateVmsAndServers(machineList, hypervisorDic, logFile):
     for target in machineList:
         if target['TYPE'].upper() == 'VIRTUAL':
@@ -138,14 +140,12 @@ def parseTestConfig(configFile):
     configPassed = True
     requiredList = []
     requiredList.append("TEST_NAME")
-    requiredList.append("GIT_BRANCH")
+    requiredList.append("FRAMEWORK_BRANCH")
     requiredList.append("REPORT_PREFIX")
     requiredList.append("HTTP_PORT")
     requiredList.append("STARTING_LISTENER")
     requiredList.append("MSF_HOSTS")
     requiredList.append("TARGETS")
-    requiredList.append("PAYLOADS")
-    requiredList.append("COMMAND_LIST")
     requiredList.append("SUCCESS_LIST")
     for item in requiredList:
         if item not in jsonDic:
@@ -287,20 +287,19 @@ def main():
         host['STAGE_TWO_SCRIPT'] = lineComment + "\n # STAGE TWO SCRIPT FOR " + host['NAME'] + lineComment   
     
     """
-    IF GLOBAL PAYLOADS OR EXPLOITS ARE LISTED, FILTER THEM AS BEST WE CAN AND ADD THEM TO EACH TARGET
+    IF GLOBAL PAYLOADS OR MODULES ARE LISTED, FILTER THEM AS BEST WE CAN AND ADD THEM TO EACH TARGET
     ALSO, REPLACE THE KEYWORD 'UNIQUE_PORT' WITH A UNIQUE PORT IN BOTH THE PAYLOAD AND EXPLOIT SETTINGS
     NB: I THINK USING GLOBAL EXPLOITS IS A TERRIBLE IDEA, BUT I AM AN ENABLER
     """
     for target in configData['TARGETS']:
         if 'PAYLOADS' not in target:
             target['PAYLOADS'] = []
-        if 'EXPLOITS' not in target:
-            target['EXPLOITS'] = []
+        if 'MODULES' not in target:
+            target['MODULES'] = []
         if 'SESSION_DATASETS' not in target:
             target['SESSION_DATASETS'] = []
         if 'PAYLOADS' in configData:
             for payload in configData['PAYLOADS']:
-                #REPLACE THE STRING 'UNIQUE_PORT' WITH AN ACTUAL UNIQUE PORT
                 if 'x64' not in target['NAME'].lower() and 'x64' in payload['NAME'].lower():
                     #MISMATCHED ARCH; BAIL
                     continue
@@ -313,81 +312,63 @@ def main():
                 else:
                     logMsg(configData['LOG_FILE'], "ADDING " + str(payload))
                     target['PAYLOADS'].append(payload.copy())
-        if 'EXPLOITS' in configData:
-            for exploit in configData['EXPLOITS']:
-                #REPLACE THE STRING 'UNIQUE_PORT' WITH AN ACTUAL UNIQUE PORT
-                if 'exploit/multi/handler' == exploit['NAME'].lower() and 'upload' in target['METHOD']:
-                    continue
-                if 'x64' not in target['NAME'].lower() and 'x64' in exploit['NAME'].lower():
-                    #MISMATCHED ARCH; BAIL
-                    continue
-                if 'win' in target['NAME'].lower() and 'mettle' in exploit['NAME'].lower():
-                    #DO ONT USE METTLE PAYLOADS ON WINDOWS
-                    continue
-                if 'win' not in target['NAME'].lower() and 'win' in exploit['NAME'].lower():
-                    #ONLY USE WIN PAYLOADS ON WIN
-                    continue
-                if exploit['NAME'] in target['EXPLOITS']:
-                    logMsg(configData['LOG_FILE'], "ADDING " + str(exploit))
-                    continue
-                else:
-                    target['EXPLOITS'].append(exploit.copy())
-    for target in configData['TARGETS']:
-        logMsg(configData['LOG_FILE'], "PAYLOADS = " + str(target['PAYLOADS']))
-        logMsg(configData['LOG_FILE'], "EXPLOITS = " + str(target['EXPLOITS']))
-        for payload in target['PAYLOADS']:
-            logMsg(configData['LOG_FILE'], str(payload))
-            #REPLACE THE STRING 'UNIQUE_PORT' WITH AN ACTUAL UNIQUE PORT
-            for settingItem in payload['SETTINGS']:
-                logMsg(configData['LOG_FILE'], "SETTING ITEM= " + settingItem + str(id(settingItem)))
-                if 'UNIQUE_PORT' in settingItem:
-                    logMsg(configData['LOG_FILE'], "UNIQUE PORT IN SETTING ITEM")
-                while "UNIQUE_PORT" in settingItem:
-                    settingItem = settingItem.replace("UNIQUE_PORT", str(portNum.get()), 1)
-                logMsg(configData['LOG_FILE'], "SETTING ITEM= " + settingItem + str(id(settingItem)))
-                if 'UNIQUE_PORT' in settingItem:
-                    logMsg(configData['LOG_FILE'], "FAILED TO CHANGE UNIQUE PORT")
-        for exploit in target['EXPLOITS']:
-            logMsg(configData['LOG_FILE'], str(exploit))
-            #REPLACE THE STRING 'UNIQUE_PORT' WITH AN ACTUAL UNIQUE PORT
-            for index in range(len(exploit['SETTINGS'])):
-                logMsg(configData['LOG_FILE'], "SETTING ITEM= " + exploit['SETTINGS'][index] + str(id(exploit['SETTINGS'][index])))
-                if 'UNIQUE_PORT' in exploit['SETTINGS'][index]:
-                    logMsg(configData['LOG_FILE'], "UNIQUE PORT IN SETTING ITEM")
-                while "UNIQUE_PORT" in exploit['SETTINGS'][index]:
-                    exploit['SETTINGS'][index] = exploit['SETTINGS'][index].replace("UNIQUE_PORT", str(portNum.get()), 1)
-                logMsg(configData['LOG_FILE'], "SETTING ITEM= " + exploit['SETTINGS'][index] + str(id(exploit['SETTINGS'][index])))
-
-    for target in configData['TARGETS']:
-        logMsg(configData['LOG_FILE'], "PAYLOADS = " + str(target['PAYLOADS']))
-        logMsg(configData['LOG_FILE'], "EXPLOITS = " + str(target['EXPLOITS']))
-        for payload in target['PAYLOADS']:
-            for settingItem in payload['SETTINGS']:
-                logMsg(configData['LOG_FILE'], str(settingItem) + "_" + str(id(settingItem)))
-        for exploit in target['EXPLOITS']:
-            for settingItem in exploit['SETTINGS']:
-                logMsg(configData['LOG_FILE'], str(settingItem) + "_" + str(id(settingItem)))
-            #REPLACE THE STRING 'UNIQUE_PORT' WITH AN ACTUAL UNIQUE PORT
+                # TODO: ADD A CHECK SO WE DO NOT HAVE MULTIPLE SIMILAR MODULES
+        if 'MODULES' in configData:
+            for module in configData['MODULES']:
+                target['MODULES'].append(module.copy())
+     
     """
-    NOW EACH HOST HAS A LIST OF ALL THE EXPLOITS AND PAYLOADS IT NEEDS TO USE...... ASSEMBLE THEM TO FORM VOLTRON..... 
-    I MEAN SESSION_DATA
+    NOW THAT THE MODULES AND PAYLOADS HAVE BEEN BROKEN OUT, REPLACE THE UNIQUE_PORT
+    KEYWORDS WITH A UNIQUE PORT VALUE
+    """           
+    for target in configData['TARGETS']:
+        logMsg(configData['LOG_FILE'], "MODULES = " + str(target['MODULES']))
+        if 'PAYLOADS' in target:
+            logMsg(configData['LOG_FILE'], "PAYLOADS = " + str(target['PAYLOADS']))
+            for payload in target['PAYLOADS']:
+                logMsg(configData['LOG_FILE'], str(payload))
+                #REPLACE THE STRING 'UNIQUE_PORT' WITH AN ACTUAL UNIQUE PORT
+                for settingItem in payload['SETTINGS']:
+                    logMsg(configData['LOG_FILE'], "SETTING ITEM= " + settingItem + str(id(settingItem)))
+                    while "UNIQUE_PORT" in settingItem:
+                        settingItem = settingItem.replace("UNIQUE_PORT", str(portNum.get()), 1)
+                    logMsg(configData['LOG_FILE'], "SETTING ITEM= " + settingItem + str(id(settingItem)))
+        for module in target['MODULES']:
+            logMsg(configData['LOG_FILE'], str(module))
+            #REPLACE THE STRING 'UNIQUE_PORT' WITH AN ACTUAL UNIQUE PORT
+            for index in range(len(module['SETTINGS'])):
+                logMsg(configData['LOG_FILE'], "SETTING ITEM= " + module['SETTINGS'][index] + str(id(module['SETTINGS'][index])))
+                while "UNIQUE_PORT" in module['SETTINGS'][index]:
+                    module['SETTINGS'][index] = module['SETTINGS'][index].replace("UNIQUE_PORT", str(portNum.get()), 1)
+                logMsg(configData['LOG_FILE'], "SETTING ITEM= " + module['SETTINGS'][index] + str(id(module['SETTINGS'][index])))
+
+    #DEBUG PRINT
+    for target in configData['TARGETS']:
+        if 'PAYLOADS' in target:
+            logMsg(configData['LOG_FILE'], "PAYLOADS = " + str(target['PAYLOADS']))
+        logMsg(configData['LOG_FILE'], "MODULES = " + str(target['MODULES']))
+
+    """
+    NOW EACH HOST HAS A LIST OF ALL THE MODULES AND (POSSIBLY) PAYLOADS IT NEEDS TO USE...... 
+    ASSEMBLE EXPLOITS AND PAYLOADS OR JUST MODULES THEM TO FORM VOLTRON..... I MEAN, SESSION_DATA
     """
     for target in configData['TARGETS']:
         logMsg(configData['LOG_FILE'], str(target))
-        if 'EXPLOITS' not in target:
-            logMsg(configData['LOG_FILE'], "CONFIG FILE DID NOT HAVE EXPLOITS LISTED FOR " + target['NAME'] + ".  NOTHING TO TEST?")
+        if 'MODULES' not in target:
+            logMsg(configData['LOG_FILE'], "CONFIG FILE DID NOT HAVE MODULES LISTED FOR " + target['NAME'] + ".  NOTHING TO TEST?")
             bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
-        if 'PAYLOADS' not in target:
-            logMsg(configData['LOG_FILE'], "CONFIG FILE DID NOT HAVE PAYLOADS LISTED FOR " + target['NAME'] + ".  NOTHING TO TEST?")
-            bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
-        for exploit in target['EXPLOITS']:
-            logMsg(configData['LOG_FILE'], str(exploit))
-            for payload in target['PAYLOADS']:
-                logMsg(configData['LOG_FILE'], str(payload))
+        for module in target['MODULES']:
+            logMsg(configData['LOG_FILE'], str(module))
+            if 'exploit' in module['NAME'].lower():
+                for payload in target['PAYLOADS']:
+                    logMsg(configData['LOG_FILE'], str(payload))
+                    tempDic = {}
+                    tempDic['MODULE'] = module.copy()
+                    tempDic['PAYLOAD'] = payload.copy()
+            else:
                 tempDic = {}
-                tempDic['EXPLOIT'] = exploit
-                tempDic['PAYLOAD'] = payload
-                target['SESSION_DATASETS'].append(tempDic)
+                tempDic['MODULE'] = module.copy()
+            target['SESSION_DATASETS'].append(tempDic)
     
     """
     JUST A DEBUG PRINT HERE TO VERIFY THE STRUCTURES WERE CREATED CORRECTLY
@@ -397,7 +378,10 @@ def main():
         logMsg(configData['LOG_FILE'], "SESSION_DATASETS FOR " + target['NAME'])
         logMsg(configData['LOG_FILE'], "================================================================================")
         for sessionData in target['SESSION_DATASETS']:
-            logMsg(configData['LOG_FILE'], sessionData['EXPLOIT']['NAME'] + ":" + sessionData['PAYLOAD']['NAME'])
+            if 'PAYLOAD' in sessionData:
+                logMsg(configData['LOG_FILE'], sessionData['MODULE']['NAME'] + ":" + sessionData['PAYLOAD']['NAME'])
+            else:
+                logMsg(configData['LOG_FILE'], sessionData['MODULE']['NAME'])
             
     """
     PROCESS CLONES
@@ -436,7 +420,10 @@ def main():
         logMsg(configData['LOG_FILE'], "SESSION_DATASETS FOR " + target['NAME'])
         logMsg(configData['LOG_FILE'], "================================================================================")
         for sessionData in target['SESSION_DATASETS']:
-            logMsg(configData['LOG_FILE'], sessionData['EXPLOIT']['NAME'] + ":" + sessionData['PAYLOAD']['NAME'])
+            if 'PAYLOAD' in sessionData:
+                logMsg(configData['LOG_FILE'], sessionData['MODULE']['NAME'] + ":" + sessionData['PAYLOAD']['NAME'])
+            else:
+                logMsg(configData['LOG_FILE'], sessionData['MODULE']['NAME'])
             
     """
     INSTANTIATE REQUIRED SERVER INSTANCES AND ADD THEM TO THE DICTIONARY
@@ -526,8 +513,7 @@ def main():
         stageOneContent = stageOneContent + "git fetch upstream\n"
         stageOneContent = stageOneContent + "git reset --hard FETCH_HEAD\n"
         stageOneContent = stageOneContent + "git clean -df\n"
-        stageOneContent = stageOneContent + "git checkout " + configData['GIT_BRANCH'] + "\n"
-#        stageOneContent = stageOneContent + "git checkout upstream/master\n"
+        stageOneContent = stageOneContent + "git checkout " + configData['FRAMEWORK_BRANCH'] + "\n"
         stageOneContent = stageOneContent + "git log | head -n 1 > " + host['COMMIT_FILE'] + "\n"
         stageOneContent = stageOneContent + "gem install bundler\n"
         stageOneContent = stageOneContent + "bundle install\n"
@@ -543,24 +529,30 @@ def main():
         logMsg(configData['LOG_FILE'], host['NAME'])
         logMsg(configData['LOG_FILE'], "=============================================================================")
         for sessionData in host['SESSION_DATASETS']:
-            sessionData['PAYLOAD']['PRIMARY_PORT'] = portNum.get()
+            if 'PAYLOAD' in sessionData:
+                sessionData['PAYLOAD']['PRIMARY_PORT'] = portNum.get()
 #            logMsg(configData['LOG_FILE'], "ASSIGNING PORT VALUE " + str(sessionData['PAYLOAD']['PRIMARY_PORT']) + \
 #                    " TO " + sessionData['PAYLOAD']['NAME'] + " : " + sessionData['EXPLOIT']['NAME'] + ":" + host['NAME'])
             sessionData['MSF_HOST'] = configData['MSF_HOSTS'][sessionCounter % len(configData['MSF_HOSTS'])]
             sessionCounter = sessionCounter + 1
             logMsg(configData['LOG_FILE'], "ASSIGNING TO MSF_HOST " + sessionData['MSF_HOST']['NAME'])
             stageOneContent = '\n\n##########################\n'
-            stageOneContent = stageOneContent + '# EXPLOIT:  ' + sessionData['EXPLOIT']['NAME'] + '\n'
-            stageOneContent = stageOneContent + '# PAYLOAD:  ' + sessionData['PAYLOAD']['NAME'] + '\n'
+            stageOneContent = stageOneContent + '# MODULE:  ' + sessionData['MODULE']['NAME'] + '\n'
+            if 'PAYLOAD' in sessionData:
+                stageOneContent = stageOneContent + '# PAYLOAD:  ' + sessionData['PAYLOAD']['NAME'] + '\n'
             stageOneContent = stageOneContent + '# TARGET:   ' + host['IP_ADDRESS'] + '\n'
             stageOneContent = stageOneContent + '# MSF_HOST: ' + sessionData['MSF_HOST']['IP_ADDRESS'] + '\n'
             stageOneContent = stageOneContent + '#\n'
 #            stageOneContent = stageOneContent + '#sleep 5\n'
-            if sessionData['EXPLOIT']['NAME'].lower() == 'exploit/multi/handler':
+            if 'PAYLOAD' in sessionData:
+                uniqueId = str(sessionData['PAYLOAD']['PRIMARY_PORT'])
+            else:
+                uniqueId = getTimestamp()
+            if sessionData['MODULE']['NAME'].lower() == 'exploit/multi/handler':
                 # WE NEED TO ADD THE MSFVENOM COMMAND TO MAKE THE PAYLOAD TO THE STAGE ONE SCRIPT
                 sessionData['PAYLOAD']['FILENAME'] =    '-'.join(sessionData['PAYLOAD']['NAME'].split('/')) + \
                                                         '-' + 'x'.join(host['IP_ADDRESS'].split('.')) + \
-                                                        '-' + str(sessionData['PAYLOAD']['PRIMARY_PORT'])
+                                                        '-' + uniqueId
                 sessionData['PAYLOAD']['VENOM_CMD'] =  apt_shared.makeVenomCmd(host, 
                                                                                sessionData, 
                                                                                portNum, 
@@ -571,20 +563,22 @@ def main():
                                             ' ./test_payloads/' + sessionData['PAYLOAD']['FILENAME'] + '\n'
                 sessionData['RC_IN_SCRIPT_NAME'] = "test_rc/" + sessionData['PAYLOAD']['FILENAME'].split('.')[0]+'.rc'
             else:
-                sessionData['RC_IN_SCRIPT_NAME'] = "test_rc/" + '-'.join(sessionData['PAYLOAD']['NAME'].split('/')) + '_' + \
-                                                    host['IP_ADDRESS'] + '_' + str(sessionData['PAYLOAD']['PRIMARY_PORT']) + '.rc'
+                sessionData['RC_IN_SCRIPT_NAME'] = "test_rc/" + '-'.join(sessionData['MODULE']['NAME'].split('/')) + '_' + \
+                                                    host['IP_ADDRESS'] + '_' + uniqueId + '.rc'
             sessionData['RC_OUT_SCRIPT_NAME'] = sessionData['RC_IN_SCRIPT_NAME'] + '.out'
             rcScriptContent = apt_shared.makeRcScript(configData['COMMAND_LIST'],
                                                       host, 
                                                       sessionData, 
                                                       configData['LOG_FILE'])
             stageOneContent = stageOneContent + rcScriptContent + '\n'
-            if 'bind' in sessionData['PAYLOAD']['NAME'].lower() and sessionData['EXPLOIT']['NAME'].lower() == 'exploit/multi/handler':
-                launchBind = './msfconsole -qr '+ sessionData['RC_IN_SCRIPT_NAME'] + ' > ' + sessionData['RC_OUT_SCRIPT_NAME'] + '&\n'
-                sessionData['MSF_HOST']['STAGE_THREE_SCRIPT'] = sessionData['MSF_HOST']['STAGE_THREE_SCRIPT'] + launchBind
+            if 'PAYLOAD' in sessionData \
+                and 'bind' in sessionData['PAYLOAD']['NAME'].lower() \
+                and sessionData['MODULE']['NAME'].lower() == 'exploit/multi/handler':
+                    launchBind = './msfconsole -qr '+ sessionData['RC_IN_SCRIPT_NAME'] + ' > ' + sessionData['RC_OUT_SCRIPT_NAME'] + '&\n'
+                    sessionData['MSF_HOST']['STAGE_THREE_SCRIPT'] = sessionData['MSF_HOST']['STAGE_THREE_SCRIPT'] + launchBind
             else:
                 stageOneContent = stageOneContent + './msfconsole -qr '+ \
-                                    sessionData['RC_IN_SCRIPT_NAME'] + ' > ' + sessionData['RC_OUT_SCRIPT_NAME'] + ' &\n'
+                                        sessionData['RC_IN_SCRIPT_NAME'] + ' > ' + sessionData['RC_OUT_SCRIPT_NAME'] + ' &\n'
             sessionData['MSF_HOST']['STAGE_ONE_SCRIPT'] = sessionData['MSF_HOST']['STAGE_ONE_SCRIPT'] + stageOneContent
 
     """
@@ -788,7 +782,10 @@ def main():
     for target in configData['TARGETS']:
         logMsg(configData['LOG_FILE'], "CHECKING " + target['NAME'])
         for sessionData in target['SESSION_DATASETS']:
-            logMsg(configData['LOG_FILE'], "CHECKING " + sessionData['EXPLOIT']['NAME'] + ":" + sessionData['PAYLOAD']['NAME'])
+            payloadName = "NONE"
+            if 'PAYLOAD' in sessionData:
+                payloadName = sessionData['PAYLOAD']['NAME']
+            logMsg(configData['LOG_FILE'], "CHECKING " + sessionData['MODULE']['NAME'] + ":" + payloadName)
             statusFlag = True
             try:
                 fileObj = open(sessionData['LOCAL_SESSION_FILE'], 'r')
@@ -806,16 +803,14 @@ def main():
                 logMsg(configData['LOG_FILE'], sessionData['LOCAL_SESSION_FILE'])
                 logMsg(configData['LOG_FILE'], "TEST PASSED: " + \
                        target['NAME'] + ':' + \
-                       sessionData['PAYLOAD']['NAME'] + ":" + \
-                       sessionData['EXPLOIT']['NAME'] + ":" + \
-                       str(sessionData['PAYLOAD']['PRIMARY_PORT']))
+                       payloadName + ":" + \
+                       sessionData['MODULE']['NAME'])
             else:
                 logMsg(configData['LOG_FILE'], sessionData['LOCAL_SESSION_FILE'])
                 logMsg(configData['LOG_FILE'], "TEST FAILED: " + \
                         target['NAME'] + ':' + \
-                        sessionData['PAYLOAD']['NAME'] + ":" + \
-                       sessionData['EXPLOIT']['NAME'] + ":" + \
-                       str(sessionData['PAYLOAD']['PRIMARY_PORT']))
+                        payloadName + ":" + \
+                       sessionData['MODULE']['NAME'])
     
     htmlReportString = apt_shared.makeHtmlReport(configData['TARGETS'], configData['MSF_HOSTS'])
     htmlFileName = configData['REPORT_DIR'] + "/" + configData['REPORT_PREFIX'] + ".html"

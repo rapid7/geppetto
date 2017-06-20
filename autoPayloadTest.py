@@ -28,6 +28,9 @@ def bailSafely(targets, msfHosts):
     exit(1)
 
 def breakoutClones(hostDicList, logFile):
+    """
+    TODO: FIX THIS SO ANYTHING NOT LISTED WILL EXPAND RATHER THAN EXPAND ONLY WHAT'S LISTED
+    """
     for host in hostDicList:
         if "CLONES" in host:
             numClones = len(host['CLONES']) + 1 #Don't forget the original
@@ -43,7 +46,10 @@ def breakoutClones(hostDicList, logFile):
                         cloneDic[item] = clone['NAME']
                         logMsg(logFile, "ADDED CLONE " + clone['NAME'])
                     elif item == 'HYPERVISOR_CONFIG':
-                        cloneDic[item] = clone['HYPERVISOR_CONFIG'] 
+                        if 'HYPERVISOR_CONFIG' in clone:
+                            cloneDic[item] = clone['HYPERVISOR_CONFIG']
+                        else: 
+                            cloneDic[item] = host['HYPERVISOR_CONFIG']
                     elif item == 'SESSION_DATASETS':
                         if 'SESSION_DATASETS' not in clone:
                             cloneDic['SESSION_DATASETS'] = []
@@ -96,6 +102,13 @@ def expandGlobalAttributes(configData, logFile = "default.log"):
 def getTimestamp():
     return str(time.time()).split('.')[0]
 
+def getElement(element, vmName, credsDic):
+    for credVmName in credsDic.keys():
+        if vmName in credVmName:
+            if element in credsDic[credVmName]:
+                return credsDic[credVmName][element]
+    return False
+
 def getCreds(configData, logFile = "default.log"):
     if 'LOG_FILE' in configData:
         logFile = configData['LOG_FILE']
@@ -114,22 +127,23 @@ def getCreds(configData, logFile = "default.log"):
     
     vmList = configData['MSF_HOSTS'] + configData['TARGETS']
     
-    for vmObject in vmList:
-        logMsg(logFile, "CHECKING CREDS FOR: " + str(vmObject['NAME']) + '\n')
-
-        try:
-            if 'USERNAME' not in vmObject:
-                logMsg(logFile, "NO USERNAME FOR " + str(vmObject['NAME']) + '\n')
-                vmObject['USERNAME'] = credsDic[vmObject['NAME']]['USERNAME']
-            if 'PASSWORD' not in vmObject:
-                logMsg(logFile, "NO PASSWORD FOR " + str(vmObject['NAME']) + '\n')
-                vmObject['PASSWORD'] = credsDic[vmObject['NAME']]['PASSWORD']
-        except KeyError as e:
-            logMsg(logFile, "FAILED TO FIND CREDS FOR: " + str(vmObject['NAME']) + '\n' + str(e))
-            continue
-        except Exception as e:
-            logMsg(logFile, "NOT SURE WHAT HAPPENED?\n" + str(e))
-            return False
+    for vm in vmList:
+        if 'USERNAME' not in vm:
+            logMsg(logFile, "NO USERNAME FOR " + str(vm['NAME']) + '\n')
+            username = getElement('USERNAME', vm['NAME'],  credsDic)
+            if username == False:
+                return False
+            else:
+                logMsg(logFile, "FOUND USERNAME FOR " + str(vm['NAME']) + '\n')
+                vm['USERNAME'] = username
+        if 'PASSWORD' not in vm:
+            logMsg(logFile, "NO PASSWORD FOR " + str(vm['NAME']) + '\n')
+            password = getElement('PASSWORD', vm['NAME'],  credsDic)
+            if password == False:
+                return False
+            else:
+                logMsg(logFile, "FOUND PASSWORD FOR " + str(vm['NAME']) + '\n')
+                vm['PASSWORD'] = password
     return True
 
 
@@ -190,9 +204,7 @@ def verifyConfig(jsonDic):
     """
     configPassed = True
     requiredList = []
-    requiredList.append("TEST_NAME")
     requiredList.append("FRAMEWORK_BRANCH")
-    requiredList.append("REPORT_PREFIX")
     requiredList.append("HTTP_PORT")
     requiredList.append("STARTING_LISTENER")
     requiredList.append("MSF_HOSTS")
@@ -284,6 +296,7 @@ def main():
     """
     SET UP DIRECTORY NAMES IN THE CONFIG DICTIONARY
     """
+    configData['REPORT_PREFIX'] = testJsonFile
     configData['TIMESTAMP'] =   str(time.time()).split('.')[0]
     configData['DATA_DIR']  =   os.getcwd() + "/" + "test_data"
     configData['TEST_DIR'] =    configData['DATA_DIR'] + "/" + configData['REPORT_PREFIX'] + "_" + configData['TIMESTAMP']

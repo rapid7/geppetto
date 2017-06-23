@@ -1,6 +1,6 @@
 import sys
 sys.path.insert(0, '../vm-automation')
-
+import os
 import workstationVm
 import apt_shared
 import esxiVm
@@ -212,15 +212,16 @@ def verifyConfig(jsonDic):
     requiredList.append("SUCCESS_LIST")
     for item in requiredList:
         if item not in jsonDic:
-            print "MISSING " + item + " IN CONFIG: " + configFile
+            print "MISSING " + item + " IN CONFIGURATION FILE\n"
             configPassed = False
     if not configPassed:
-        return None
+        return False
     
     """
     MSF_HOSTS
     """
     requiredMsfData = []
+    requiredList.append("MSF_ARTIFACT_PATH")
     requiredMsfData.append("TYPE")
     requiredMsfData.append("METHOD")
     requiredMsfData.append("NAME")
@@ -230,7 +231,7 @@ def verifyConfig(jsonDic):
                 print "NO " + requiredData + " LISTED FOR MSF_HOST IN " + configFile
                 configPassed = False
     if not configPassed:
-        return None
+        return False
     """
     SPECIFIC FOR TARGETS
     """
@@ -263,7 +264,7 @@ def verifyConfig(jsonDic):
                 print "NO " + requiredItem + " LISTED FOR " + target['NAME'] + " IN " + configFile
                 configPassed = False
         if not configPassed:
-            return None
+            return False
     return True
 
 def parseHypervisorConfig(hypervisorConfigFile):
@@ -296,7 +297,7 @@ def main():
     """
     SET UP DIRECTORY NAMES IN THE CONFIG DICTIONARY
     """
-    configData['REPORT_PREFIX'] = testJsonFile
+    configData['REPORT_PREFIX'] = os.path.splitext(os.path.basename(testJsonFile))[0]
     configData['TIMESTAMP'] =   str(time.time()).split('.')[0]
     configData['DATA_DIR']  =   os.getcwd() + "/" + "test_data"
     configData['TEST_DIR'] =    configData['DATA_DIR'] + "/" + configData['REPORT_PREFIX'] + "_" + configData['TIMESTAMP']
@@ -496,8 +497,8 @@ def main():
             else:
                 logMsg(configData['LOG_FILE'], sessionData['MODULE']['NAME'])
     
-    verifyConfig(configData)
-            
+    if not verifyConfig(configData):
+        bailSafely(testVms, msfVms)
     """
     INSTANTIATE REQUIRED SERVER INSTANCES AND ADD THEM TO THE DICTIONARY
     """
@@ -575,12 +576,16 @@ def main():
     """
     THE FIRST FEW LINES OF THE STAGE ONE SCRIPT PREP THINGS
     """
+    
     fileId=0;
     for host in configData['MSF_HOSTS']:
         fileId = fileId + 1
         # STAGE ONE SCRIPT STUFF
-        host['COMMIT_FILE'] = host['MSF_PATH'] + "commit_tag_" + configData['TIMESTAMP']
-        host['STAGE_ONE_FILENAME'] = configData['SCRIPT_DIR'] + '/' + "stageOneScript_" +  str(fileId) + ".sh"
+        host['STAGE_ONE_FILENAME'] =    configData['SCRIPT_DIR'] + '/' + "stageOneScript_" +  str(fileId) + ".sh"
+        host['MSF_PAYLOAD_PATH'] =      host['MSF_ARTIFACT_PATH'] + "/test_payloads"
+        host['RC_PATH'] =               host['MSF_ARTIFACT_PATH'] + "/test_rc"
+        host['COMMIT_FILE'] =           host['MSF_ARTIFACT_PATH'] + "/commit_tag_" + configData['TIMESTAMP']
+        host ['SCRIPT_PATH'] =          host['MSF_ARTIFACT_PATH'] + "/test_scripts"
         stageOneContent = "#!/bin/bash -l \n\n"
         stageOneContent = stageOneContent + "cd " + host['MSF_PATH'] + "\n"
         stageOneContent = stageOneContent + "git fetch upstream\n"
@@ -590,8 +595,10 @@ def main():
         stageOneContent = stageOneContent + "git log | head -n 1 > " + host['COMMIT_FILE'] + "\n"
         stageOneContent = stageOneContent + "gem install bundler\n"
         stageOneContent = stageOneContent + "bundle install\n"
-        stageOneContent = stageOneContent + "mkdir test_payloads\n"
-        stageOneContent = stageOneContent + "mkdir test_rc\n"
+        stageOneContent = stageOneContent + "mkdir " + host['MSF_PAYLOAD_PATH'] + "\n"
+        stageOneContent = stageOneContent + "rm -rf " + host['MSF_PAYLOAD_PATH'] + "/*\n"
+        stageOneContent = stageOneContent + "mkdir " + host['RC_PATH'] + "\n"
+        stageOneContent = stageOneContent + "rm -rf " + host['RC_PATH'] + "/*\n"
         host['STAGE_ONE_SCRIPT'] = stageOneContent
         host['STAGE_THREE_SCRIPT'] = "#!/bin/bash -l\n\n" + "cd " + host['MSF_PATH'] + "\n"
     # MAKE THE REST OF THE STAGE ONE SCRIPT
@@ -633,10 +640,11 @@ def main():
                 #ADD VENOM COMMAND TO THE SCRIPT CONTENT
                 stageOneContent = stageOneContent + sessionData['PAYLOAD']['VENOM_CMD'] + '\n'
                 stageOneContent = stageOneContent + 'mv ' + sessionData['PAYLOAD']['FILENAME'] + \
-                                            ' ./test_payloads/' + sessionData['PAYLOAD']['FILENAME'] + '\n'
-                sessionData['RC_IN_SCRIPT_NAME'] = "test_rc/" + sessionData['PAYLOAD']['FILENAME'].split('.')[0]+'.rc'
+                                            ' ' + sessionData['MSF_HOST']['MSF_PAYLOAD_PATH'] + '/' +  sessionData['PAYLOAD']['FILENAME'] + '\n'
+                stageOneContent = stageOneContent + "sleep 10\n"
+                sessionData['RC_IN_SCRIPT_NAME'] = sessionData['MSF_HOST']['RC_PATH'] + '/' + sessionData['PAYLOAD']['FILENAME'].split('.')[0]+'.rc'
             else:
-                sessionData['RC_IN_SCRIPT_NAME'] = "test_rc/" + '-'.join(sessionData['MODULE']['NAME'].split('/')) + '_' + \
+                sessionData['RC_IN_SCRIPT_NAME'] = sessionData['MSF_HOST']['RC_PATH'] + '/' + '-'.join(sessionData['MODULE']['NAME'].split('/')) + '_' + \
                                                     host['IP_ADDRESS'] + '_' + uniqueId + '.rc'
             sessionData['RC_OUT_SCRIPT_NAME'] = sessionData['RC_IN_SCRIPT_NAME'] + '.out'
             rcScriptContent = apt_shared.makeRcScript(configData['COMMAND_LIST'],
@@ -660,7 +668,7 @@ def main():
     UPLOAD IT, AND RUN IT ON THE MSF_HOST
     """
     for msfHost in configData['MSF_HOSTS']:
-        msfHost['STAGE_ONE_SCRIPT'] = msfHost['STAGE_ONE_SCRIPT'] + "cd " + "./test_payloads/" + "\n"
+        msfHost['STAGE_ONE_SCRIPT'] = msfHost['STAGE_ONE_SCRIPT'] + "cd " + msfHost['MSF_PAYLOAD_PATH'] + "/" + "\n"
         msfHost['STAGE_ONE_SCRIPT'] = msfHost['STAGE_ONE_SCRIPT'] + "python -m SimpleHTTPServer " + str(configData['HTTP_PORT']) + " &\n"
         try:
             fileObj = open(msfHost['STAGE_ONE_FILENAME'], 'wb')
@@ -669,35 +677,46 @@ def main():
         except IOError as e:
             logMsg(configData['LOG_FILE'], "[ERROR] FAILED TO WRITE TO FILE " + msfHost['STAGE_ONE_FILENAME'] + str(e))
             bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
-        remoteStageOneScriptName = msfHost['MSF_PATH'] + '/stageOneScript.sh'
+        remoteStageOneScriptName = msfHost['SCRIPT_PATH'] + '/stageOneScript.sh'
+        msfHost['VM_OBJECT'].makeDirOnGuest(msfHost['MSF_ARTIFACT_PATH'])
+        msfHost['VM_OBJECT'].makeDirOnGuest(msfHost['SCRIPT_PATH'])
         msfHost['VM_OBJECT'].uploadAndRun(msfHost['STAGE_ONE_FILENAME'], remoteStageOneScriptName)
     
     """
     WAIT FOR THE STAGE ONE SCRIPT TO FINISH....
+    
+    PREVIOUSLY, THIS LOOKED FOR THE stageOneScript IN THE PROCESS LIST
+    BUT FOR SOME REASON. THERE WAS AN ARTIFACT LEFT FOR SEVERAL SECONDS AFTER
+    THE PROCESS EXITED.  NOW, WE USE THE PYTHON HTTP SERVER AS THE BENCHMARK FOR
+    COMPLETION.
     """
+    
     logMsg(configData['LOG_FILE'], "WAITING FOR STAGE ONE SCRIPT(S) TO COMPLETE...")
     modCounter = 0
-    msfDone = False
-    try:
-        while msfDone == False:
-            modCounter = modCounter + 1
-            for msfHost in configData['MSF_HOSTS']:
+    for host in configData['MSF_HOSTS']:
+        host['SCRIPT_COMPLETE'] = False
+    scriptComplete = False
+    while scriptComplete == False:
+        modCounter = modCounter + 1
+        try:
+            time.sleep(1)
+        except KeyboardInterrupt:
+            print "CAUGHT KEYBOARD INTERRUPT; ABORTING TEST AND RESETTING VMS...."
+            bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
+        scriptComplete = True
+        for host in configData['MSF_HOSTS']:
+            if host['SCRIPT_COMPLETE'] == False:
+                scriptComplete = False
+                if modCounter % 5 == 0:
+                    logMsg(configData['LOG_FILE'], "PAYLOAD CREATION SCRIPT STILL RUNNING ON " + host['NAME'])
                 msfHost['VM_OBJECT'].updateProcList()
-                msfDone = True
                 for procEntry in msfHost['VM_OBJECT'].procList:
-                    # I HAVE NO IDEA WHY, BUT THE CHMOD PROCESS SOMETIMES STICKS IN THE PROC LIST.....
-                    if (remoteStageOneScriptName in procEntry) and ('chmod' not in procEntry):
-                        msfDone = False
-                        time.sleep(1)
-                        if modCounter % 10 == 0:
-                            logMsg(configData['LOG_FILE'], "PAYLOAD CREATION SCRIPT STILL RUNNING ON " + msfHost['NAME'])
-                            logMsg(configData['LOG_FILE'], str(procEntry))
-            if msfDone ==True:
-                logMsg(configData['LOG_FILE'], "PAYLOAD CREATION SCRIPT DONE RUNNING ON " + msfHost['NAME'])
-    except KeyboardInterrupt:
-        print "CAUGHT KEYBOARD INTERRUPT; ABORTING TEST AND RESETTING VMS...."
-        bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
-        
+                    if ('python' in procEntry.lower()) and (str(configData['HTTP_PORT']) in procEntry):
+                        logMsg(configData['LOG_FILE'], "PAYLOAD CREATION SCRIPT FINISHED ON " + host['NAME'])
+                        logMsg(configData['LOG_FILE'], str(procEntry))
+                        host['SCRIPT_COMPLETE'] = True
+    logMsg(configData['LOG_FILE'], "PAYLOAD CREATION SCRIPTS COMPLETE")
+    logMsg(configData['LOG_FILE'], "WRITING JSON FILE")
     try:
         fileObj = open(configData['REPORT_DIR'] + '/' + "test.json", 'w')
         json.dump(configData, fileObj)
@@ -771,7 +790,7 @@ def main():
         except IOError as e:
             logMsg(configData['LOG_FILE'], "[ERROR] FAILED TO OPEN FILE " + localScriptName + '\n' + str(e))
             bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
-        remoteScriptName = msfHost['MSF_PATH'] + "/stageThree.sh"
+        remoteScriptName = msfHost['SCRIPT_PATH'] + "/stageThree.sh"
         remoteInterpreter = None
         if not msfHost['VM_OBJECT'].uploadAndRun(localScriptName, remoteScriptName, remoteInterpreter):
             logMsg(configData['LOG_FILE'], "[FATAL ERROR]: FAILED TO UPLOAD/EXECUTE " + localScriptName + " ON " + msfHost['VM_OBJECT'].vmName)
@@ -815,11 +834,11 @@ def main():
     for target in configData['TARGETS']:
         for sessionData in target['SESSION_DATASETS']:
             msfPath = sessionData['MSF_HOST']['MSF_PATH']
-            remoteFileName = msfPath + '/' + sessionData['RC_OUT_SCRIPT_NAME']
+            remoteFileName = sessionData['RC_OUT_SCRIPT_NAME']
             logMsg(configData['LOG_FILE'], "RC_OUT_SCRIPT_NAME = " + str(sessionData['RC_OUT_SCRIPT_NAME']))
             logMsg(configData['LOG_FILE'], "SESSION_DIR = " + configData['SESSION_DIR'])
-            logMsg(configData['LOG_FILE'], "RC_OUT_SCRIPT_NAME = " + str(sessionData['RC_OUT_SCRIPT_NAME'].split('/')[1]))
-            localFileName = configData['SESSION_DIR'] + '/' + str(sessionData['RC_OUT_SCRIPT_NAME'].split('/')[1])
+            logMsg(configData['LOG_FILE'], "RC_OUT_SCRIPT_NAME = " + str(sessionData['RC_OUT_SCRIPT_NAME'].split('/')[-1]))
+            localFileName = configData['SESSION_DIR'] + '/' + str(sessionData['RC_OUT_SCRIPT_NAME'].split('/')[-1])
             sessionData['LOCAL_SESSION_FILE'] = localFileName
             logMsg(configData['LOG_FILE'], "SAVING " + target['NAME'] + ":" + remoteFileName + " AS " + localFileName)
             if not sessionData['MSF_HOST']['VM_OBJECT'].getFileFromGuest(remoteFileName, localFileName):

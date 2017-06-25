@@ -524,6 +524,7 @@ def main():
     for host in configData['TARGETS']:
         if host['TYPE'] == "VIRTUAL":
             if 'TESTING_SNAPSHOT' in host:
+                logMsg(configData['LOG_FILE'], "TRYING TO REVERT TO " + host['TESTING_SNAPSHOT'])
                 host['VM_OBJECT'].revertToSnapshotByName(host['TESTING_SNAPSHOT'])
             else:
                 host['VM_OBJECT'].takeTempSnapshot()
@@ -531,6 +532,7 @@ def main():
         if host['TYPE'] == 'VIRTUAL':
             host['VM_OBJECT'].getSnapshots()
             host['VM_OBJECT'].powerOn(False)
+            time.sleep(5)
 
     """
     WAIT FOR THE VMS TO BE READY
@@ -641,7 +643,7 @@ def main():
                 stageOneContent = stageOneContent + sessionData['PAYLOAD']['VENOM_CMD'] + '\n'
                 stageOneContent = stageOneContent + 'mv ' + sessionData['PAYLOAD']['FILENAME'] + \
                                             ' ' + sessionData['MSF_HOST']['MSF_PAYLOAD_PATH'] + '/' +  sessionData['PAYLOAD']['FILENAME'] + '\n'
-                stageOneContent = stageOneContent + "sleep 10\n"
+                stageOneContent = stageOneContent + "sleep 20\n"
                 sessionData['RC_IN_SCRIPT_NAME'] = sessionData['MSF_HOST']['RC_PATH'] + '/' + sessionData['PAYLOAD']['FILENAME'].split('.')[0]+'.rc'
             else:
                 sessionData['RC_IN_SCRIPT_NAME'] = sessionData['MSF_HOST']['RC_PATH'] + '/' + '-'.join(sessionData['MODULE']['NAME'].split('/')) + '_' + \
@@ -657,6 +659,7 @@ def main():
                 and sessionData['MODULE']['NAME'].lower() == 'exploit/multi/handler':
                     launchBind = './msfconsole -qr '+ sessionData['RC_IN_SCRIPT_NAME'] + ' > ' + sessionData['RC_OUT_SCRIPT_NAME'] + '&\n'
                     sessionData['MSF_HOST']['STAGE_THREE_SCRIPT'] = sessionData['MSF_HOST']['STAGE_THREE_SCRIPT'] + launchBind
+                    sessionData['MSF_HOST']['STAGE_THREE_SCRIPT'] = sessionData['MSF_HOST']['STAGE_THREE_SCRIPT'] + "sleep 10\n"
             else:
                 stageOneContent = stageOneContent + './msfconsole -qr '+ \
                                         sessionData['RC_IN_SCRIPT_NAME'] + ' > ' + sessionData['RC_OUT_SCRIPT_NAME'] + ' &\n'
@@ -723,7 +726,10 @@ def main():
         fileObj.close()
     except:
         print "FAILED TO WRITE JSON FILE...."
-        
+    
+    for i in range(12):
+        logMsg(configData['LOG_FILE'], "SLEEPING FOR " + str((12-i)*10) + " SECONDS")
+        time.sleep(10)
     """
     MAKE PYTHON AND/OR BASH(ISH) STAGE TWO SCRIPTS TO DOWNLOAD AND START PAYLOADS ON TARGET VMs
     """
@@ -771,8 +777,10 @@ def main():
                 if maxPayloads < len(target['PAYLOADS']):
                     maxPayloads = len(target['PAYLOADS'])
         timeToSleep = 15 + 5 * maxPayloads
-        logMsg(configData['LOG_FILE'], "WAITING " + str(timeToSleep) + " SECONDS FOR STAGE TWO SCRIPT TO FINISH")
-        time.sleep(timeToSleep)
+        for i in range(maxPayloads):
+            if i % 10 == 0:
+                logMsg(configData['LOG_FILE'], "WAITING " + str(timeToSleep - i) + " SECONDS FOR STAGE TWO SCRIPT TO FINISH")
+            time.sleep(1)
         logMsg(configData['LOG_FILE'], "WAKING UP")
     else:
         logMsg(configData['LOG_FILE'], "NO STAGE TWO SCRIPTS UPLOADED..... NOTHING TO SEE HERE; MOVE ALONG")

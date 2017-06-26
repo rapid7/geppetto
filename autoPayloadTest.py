@@ -11,21 +11,38 @@ import hashlib
 import os
 import json
 
+
+"""
+TODO:
+Sycnhronize everything
+fix file discovery
+make exit codes reflect success
+"""
+
+
 def bailSafely(targets, msfHosts):
     print "AN ERROR HAPPENED; RETURNING VMS TO THEIR FULL UPRIGHT AND LOCKED POSITIONS"
     timeToWait = 10
     for i in range(timeToWait):
         print "SLEEPING FOR " + str(timeToWait-i) + " SECOND(S); EXIT NOW TO PRESERVE VMS!"
         time.sleep(1)
-    for host in  msfHosts:
-        if host['TYPE'] == "VIRTUAL":
-            host['VM_OBJECT'].revertMsfVm()
-            host['VM_OBJECT'].powerOff()
-    for host in  targets:
-        if host['TYPE'] == "VIRTUAL":
-            host['VM_OBJECT'].revertToTestingBase()
-            host['VM_OBJECT'].powerOff()
-    exit(1)
+    try:
+        for host in  msfHosts:
+            if host['TYPE'] == "VIRTUAL":
+                host['VM_OBJECT'].revertMsfVm()
+                host['VM_OBJECT'].powerOff()
+    except Exception as e:
+        print "UNABLE TO RESET MSF_HOST VMS"
+        pass
+    try:
+        for host in  targets:
+            if host['TYPE'] == "VIRTUAL":
+                host['VM_OBJECT'].revertToTestingBase()
+                host['VM_OBJECT'].powerOff()
+    except Exception as e:
+        print "UNABLE TO RESET TARGET VMS"
+        pass
+    exit(0)
 
 def breakoutClones(hostDicList, logFile):
     """
@@ -221,14 +238,14 @@ def verifyConfig(jsonDic):
     MSF_HOSTS
     """
     requiredMsfData = []
-    requiredList.append("MSF_ARTIFACT_PATH")
+    requiredMsfData.append("MSF_ARTIFACT_PATH")
     requiredMsfData.append("TYPE")
     requiredMsfData.append("METHOD")
     requiredMsfData.append("NAME")
     for requiredData in requiredMsfData:
         for msfHost in jsonDic['MSF_HOSTS']:
             if requiredData not in  msfHost:
-                print "NO " + requiredData + " LISTED FOR MSF_HOST IN " + configFile
+                print "NO " + requiredData + " LISTED FOR MSF_HOST IN CONFIG FILE"
                 configPassed = False
     if not configPassed:
         return False
@@ -286,7 +303,7 @@ def main():
     usageStatement = "autoPayloadTest <test.json>"
     if len(sys.argv) != 2:
         print "INCORRECT PARAMETER LIST:\n " + usageStatement
-        bailSafely(testVms, msfVms)
+        bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
     
     testJsonFile =              sys.argv[1]
     configData = parseTestConfig(testJsonFile)
@@ -324,7 +341,7 @@ def main():
     
     if 'CREDS_FILE' in configData:
         if getCreds(configData) == False:
-            bailSafely(testVms, msfVms)
+            bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
     
     if 'TARGET_GLOBALS' in configData:
         expandGlobalAttributes(configData)
@@ -498,7 +515,7 @@ def main():
                 logMsg(configData['LOG_FILE'], sessionData['MODULE']['NAME'])
     
     if not verifyConfig(configData):
-        bailSafely(testVms, msfVms)
+        bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
     """
     INSTANTIATE REQUIRED SERVER INSTANCES AND ADD THEM TO THE DICTIONARY
     """
@@ -730,15 +747,17 @@ def main():
                         host['SCRIPT_COMPLETE'] = True
     """
     logMsg(configData['LOG_FILE'], "WRITING JSON FILE")
+    jsonOut = configData['REPORT_DIR'] + '/' + "test.json"
     try:
-        fileObj = open(configData['REPORT_DIR'] + '/' + "test.json", 'w')
+        fileObj = open(jsonOut, 'w')
         json.dump(configData, fileObj)
         fileObj.close()
     except:
-        print "FAILED TO WRITE JSON FILE...."
+        print "FAILED TO WRITE JSON FILE: " + jsonOut
     
-    for i in range(24):
-        logMsg(configData['LOG_FILE'], "SLEEPING FOR " + str((12-i)*10) + " SECONDS")
+    waitCycles = 24
+    for i in range(waitCycles):
+        logMsg(configData['LOG_FILE'], "SLEEPING FOR " + str((waitCycles-i)*10) + " SECONDS")
         time.sleep(10)
     """
     MAKE PYTHON AND/OR BASH(ISH) STAGE TWO SCRIPTS TO DOWNLOAD AND START PAYLOADS ON TARGET VMs
@@ -862,7 +881,7 @@ def main():
             if not sessionData['MSF_HOST']['VM_OBJECT'].getFileFromGuest(remoteFileName, localFileName):
                 logMsg(configData['LOG_FILE'], "FAILED TO SAVE " + target['NAME'] + ":" + remoteFileName + " AS " + localFileName)
                 #bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
-            remoteFileName = msfPath + '/' + sessionData['RC_IN_SCRIPT_NAME']
+            remoteFileName = sessionData['RC_IN_SCRIPT_NAME']
             localFileName = configData['SESSION_DIR'] + '/' + str(sessionData['RC_IN_SCRIPT_NAME'].split('/')[-1])
             if not sessionData['MSF_HOST']['VM_OBJECT'].getFileFromGuest(remoteFileName, localFileName):
                 logMsg(configData['LOG_FILE'], "FAILED TO SAVE " + target['NAME'] + ":" + remoteFileName + " AS " + localFileName)

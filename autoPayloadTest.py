@@ -673,6 +673,9 @@ def main():
     for msfHost in configData['MSF_HOSTS']:
         msfHost['STAGE_ONE_SCRIPT'] = msfHost['STAGE_ONE_SCRIPT'] + "cd " + msfHost['MSF_PAYLOAD_PATH'] + "/" + "\n"
         msfHost['STAGE_ONE_SCRIPT'] = msfHost['STAGE_ONE_SCRIPT'] + "python -m SimpleHTTPServer " + str(configData['HTTP_PORT']) + " &\n"
+        msfHost['STAGE_ONE_SCRIPT'] = msfHost['STAGE_ONE_SCRIPT'] + "while true\n"
+        msfHost['STAGE_ONE_SCRIPT'] = msfHost['STAGE_ONE_SCRIPT'] + "  netstat -ant > netstat.txt\n"
+        msfHost['STAGE_ONE_SCRIPT'] = msfHost['STAGE_ONE_SCRIPT'] + "done\n"
         try:
             fileObj = open(msfHost['STAGE_ONE_FILENAME'], 'wb')
             fileObj.write(msfHost['STAGE_ONE_SCRIPT'])
@@ -694,6 +697,13 @@ def main():
     COMPLETION.
     """
     
+    for waitTime in range(60):
+        if waitTime % 10 == 0:
+            logMsg(configData['LOG_FILE'], "CHECKING netstat OUTPUT")
+            for host in configData['MSF_HOSTS']:
+                host['VM_OBJECT'].getFileFromGuest(host['MSF_PAYLOAD_PATH'] + "/netstat.txt", \
+                                                   configData['REPORT_DIR'] + "netstat_" + str(waitTime) + ".txt")
+    """
     logMsg(configData['LOG_FILE'], "WAITING FOR STAGE ONE SCRIPT(S) TO COMPLETE...")
     modCounter = 0
     for host in configData['MSF_HOSTS']:
@@ -718,7 +728,7 @@ def main():
                         logMsg(configData['LOG_FILE'], "PAYLOAD CREATION SCRIPT FINISHED ON " + host['NAME'])
                         logMsg(configData['LOG_FILE'], str(procEntry))
                         host['SCRIPT_COMPLETE'] = True
-    logMsg(configData['LOG_FILE'], "PAYLOAD CREATION SCRIPTS COMPLETE")
+    """
     logMsg(configData['LOG_FILE'], "WRITING JSON FILE")
     try:
         fileObj = open(configData['REPORT_DIR'] + '/' + "test.json", 'w')

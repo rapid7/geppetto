@@ -727,7 +727,7 @@ def main():
     except:
         print "FAILED TO WRITE JSON FILE...."
     
-    for i in range(12):
+    for i in range(24):
         logMsg(configData['LOG_FILE'], "SLEEPING FOR " + str((12-i)*10) + " SECONDS")
         time.sleep(10)
     """
@@ -776,8 +776,8 @@ def main():
             if 'upload' in target['METHOD'].lower():    #I ONLY CARE ABOUT UPLOADS
                 if maxPayloads < len(target['PAYLOADS']):
                     maxPayloads = len(target['PAYLOADS'])
-        timeToSleep = 15 + 5 * maxPayloads
-        for i in range(maxPayloads):
+        timeToSleep = 60 + 5 * maxPayloads
+        for i in range(timeToSleep):
             if i % 10 == 0:
                 logMsg(configData['LOG_FILE'], "WAITING " + str(timeToSleep - i) + " SECONDS FOR STAGE TWO SCRIPT TO FINISH")
             time.sleep(1)
@@ -853,7 +853,7 @@ def main():
                 logMsg(configData['LOG_FILE'], "FAILED TO SAVE " + target['NAME'] + ":" + remoteFileName + " AS " + localFileName)
                 #bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
             remoteFileName = msfPath + '/' + sessionData['RC_IN_SCRIPT_NAME']
-            localFileName = configData['SESSION_DIR'] + '/' + str(sessionData['RC_IN_SCRIPT_NAME'].split('/')[1])
+            localFileName = configData['SESSION_DIR'] + '/' + str(sessionData['RC_IN_SCRIPT_NAME'].split('/')[-1])
             if not sessionData['MSF_HOST']['VM_OBJECT'].getFileFromGuest(remoteFileName, localFileName):
                 logMsg(configData['LOG_FILE'], "FAILED TO SAVE " + target['NAME'] + ":" + remoteFileName + " AS " + localFileName)
                 #bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])

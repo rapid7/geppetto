@@ -598,6 +598,7 @@ def main():
     
     fileId=0;
     for host in configData['MSF_HOSTS']:
+        host['LISTEN_PORTS'] = []
         fileId = fileId + 1
         # STAGE ONE SCRIPT STUFF
         host['STAGE_ONE_FILENAME'] =    configData['SCRIPT_DIR'] + '/' + "stageOneScript_" +  str(fileId) + ".sh"
@@ -624,14 +625,11 @@ def main():
     sleepBreak = "\nsleep(2)\n"
     sessionCounter = 0
     for host in configData['TARGETS']:
+        host['LISTEN_PORTS'] = []
         logMsg(configData['LOG_FILE'], "=============================================================================")
         logMsg(configData['LOG_FILE'], host['NAME'])
         logMsg(configData['LOG_FILE'], "=============================================================================")
         for sessionData in host['SESSION_DATASETS']:
-            if 'PAYLOAD' in sessionData:
-                sessionData['PAYLOAD']['PRIMARY_PORT'] = portNum.get()
-#            logMsg(configData['LOG_FILE'], "ASSIGNING PORT VALUE " + str(sessionData['PAYLOAD']['PRIMARY_PORT']) + \
-#                    " TO " + sessionData['PAYLOAD']['NAME'] + " : " + sessionData['EXPLOIT']['NAME'] + ":" + host['NAME'])
             sessionData['MSF_HOST'] = configData['MSF_HOSTS'][sessionCounter % len(configData['MSF_HOSTS'])]
             sessionCounter = sessionCounter + 1
             logMsg(configData['LOG_FILE'], "ASSIGNING TO MSF_HOST " + sessionData['MSF_HOST']['NAME'])
@@ -639,14 +637,17 @@ def main():
             stageOneContent = stageOneContent + '# MODULE:  ' + sessionData['MODULE']['NAME'] + '\n'
             if 'PAYLOAD' in sessionData:
                 stageOneContent = stageOneContent + '# PAYLOAD:  ' + sessionData['PAYLOAD']['NAME'] + '\n'
+                sessionData['PAYLOAD']['PRIMARY_PORT'] = portNum.get()
+                uniqueId = str(sessionData['PAYLOAD']['PRIMARY_PORT'])
+                if 'reverse' in sessionData['PAYLOAD']['NAME'].lower() \
+                    and sessionData['MODULE']['NAME'].lower() == 'exploit/multi/handler':
+                    sessionData['MSF_HOST']['LISTEN_PORTS'].append(str(sessionData['PAYLOAD']['PRIMARY_PORT']))
+            else:
+                uniqueId = getTimestamp()
             stageOneContent = stageOneContent + '# TARGET:   ' + host['IP_ADDRESS'] + '\n'
             stageOneContent = stageOneContent + '# MSF_HOST: ' + sessionData['MSF_HOST']['IP_ADDRESS'] + '\n'
             stageOneContent = stageOneContent + '#\n'
 #            stageOneContent = stageOneContent + '#sleep 5\n'
-            if 'PAYLOAD' in sessionData:
-                uniqueId = str(sessionData['PAYLOAD']['PRIMARY_PORT'])
-            else:
-                uniqueId = getTimestamp()
             if sessionData['MODULE']['NAME'].lower() == 'exploit/multi/handler':
                 # WE NEED TO ADD THE MSFVENOM COMMAND TO MAKE THE PAYLOAD TO THE STAGE ONE SCRIPT
                 sessionData['PAYLOAD']['FILENAME'] =    '-'.join(sessionData['PAYLOAD']['NAME'].split('/')) + \
@@ -665,7 +666,7 @@ def main():
             else:
                 sessionData['RC_IN_SCRIPT_NAME'] = sessionData['MSF_HOST']['RC_PATH'] + '/' + '-'.join(sessionData['MODULE']['NAME'].split('/')) + '_' + \
                                                     host['IP_ADDRESS'] + '_' + uniqueId + '.rc'
-            sessionData['RC_OUT_SCRIPT_NAME'] = sessionData['RC_IN_SCRIPT_NAME'] + '.out'
+            sessionData['RC_OUT_SCRIPT_NAME'] = sessionData['RC_IN_SCRIPT_NAME'] + '.log'
             rcScriptContent = apt_shared.makeRcScript(configData['COMMAND_LIST'],
                                                       host, 
                                                       sessionData, 
@@ -690,8 +691,9 @@ def main():
     for msfHost in configData['MSF_HOSTS']:
         msfHost['STAGE_ONE_SCRIPT'] = msfHost['STAGE_ONE_SCRIPT'] + "cd " + msfHost['MSF_PAYLOAD_PATH'] + "/" + "\n"
         msfHost['STAGE_ONE_SCRIPT'] = msfHost['STAGE_ONE_SCRIPT'] + "python -m SimpleHTTPServer " + str(configData['HTTP_PORT']) + " &\n"
-        msfHost['STAGE_ONE_SCRIPT'] = msfHost['STAGE_ONE_SCRIPT'] + "while true\n"
+        msfHost['STAGE_ONE_SCRIPT'] = msfHost['STAGE_ONE_SCRIPT'] + "while true; do\n"
         msfHost['STAGE_ONE_SCRIPT'] = msfHost['STAGE_ONE_SCRIPT'] + "  netstat -ant > netstat.txt\n"
+        msfHost['STAGE_ONE_SCRIPT'] = msfHost['STAGE_ONE_SCRIPT'] + "  sleep 5\n"
         msfHost['STAGE_ONE_SCRIPT'] = msfHost['STAGE_ONE_SCRIPT'] + "done\n"
         try:
             fileObj = open(msfHost['STAGE_ONE_FILENAME'], 'wb')
@@ -714,13 +716,6 @@ def main():
     COMPLETION.
     """
     
-    for waitTime in range(60):
-        if waitTime % 10 == 0:
-            logMsg(configData['LOG_FILE'], "CHECKING netstat OUTPUT")
-            for host in configData['MSF_HOSTS']:
-                host['VM_OBJECT'].getFileFromGuest(host['MSF_PAYLOAD_PATH'] + "/netstat.txt", \
-                                                   configData['REPORT_DIR'] + "netstat_" + str(waitTime) + ".txt")
-    """
     logMsg(configData['LOG_FILE'], "WAITING FOR STAGE ONE SCRIPT(S) TO COMPLETE...")
     modCounter = 0
     for host in configData['MSF_HOSTS']:
@@ -746,19 +741,50 @@ def main():
                         logMsg(configData['LOG_FILE'], str(procEntry))
                         host['SCRIPT_COMPLETE'] = True
     """
+    for waitCycles in range(60):
+        logMsg(configData['LOG_FILE'], "CHECKING netstat OUTPUT")
+        remoteFile = host['MSF_PAYLOAD_PATH'] + "/netstat.txt"
+        portPassed = True
+        for host in configData['MSF_HOSTS']:
+            localFile = configData['REPORT_DIR'] + "/" + host['NAME'] + "_netstat_" + str(waitCycles) + ".txt"
+            host['VM_OBJECT'].getFileFromGuest(remoteFile, localFile)
+            try:
+                netstatFile = open(localFile, 'r')
+                netstatData = netstatFile.read()
+                netstatFile.close()
+            except Exception as e:
+                logMsg(configData['LOG_FILE'], "FAILED READING NETSTAT FILE: " + localFile + "\n" + str(e))
+                netstatData = ""
+            for port in host['LISTEN_PORTS']:
+                if str(port) not in netstatData:
+                    portPassed = False
+                    logMsg(configData['LOG_FILE'], "PORT " + str(port) + " NOT OPEN ON " + host['NAME'] + "\n")
+        if portPassed == True:
+            break;    
+        try:
+            time.sleep(5)
+        except KeyboardInterrupt:
+            print "CAUGHT KEYBOARD INTERRUPT; ABORTING TEST AND RESETTING VMS...."
+            bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
+    """
+    
     logMsg(configData['LOG_FILE'], "WRITING JSON FILE")
     jsonOut = configData['REPORT_DIR'] + '/' + "test.json"
     try:
         fileObj = open(jsonOut, 'w')
         json.dump(configData, fileObj)
         fileObj.close()
-    except:
-        print "FAILED TO WRITE JSON FILE: " + jsonOut
+    except Exception as e:
+        print "FAILED TO WRITE JSON FILE: " + jsonOut + "\n" + str(e)
     
-    waitCycles = 24
+    waitCycles = 50
     for i in range(waitCycles):
         logMsg(configData['LOG_FILE'], "SLEEPING FOR " + str((waitCycles-i)*10) + " SECONDS")
-        time.sleep(10)
+        try:
+            time.sleep(5)
+        except KeyboardInterrupt:
+            print "CAUGHT KEYBOARD INTERRUPT; ABORTING TEST AND RESETTING VMS...."
+            bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
     """
     MAKE PYTHON AND/OR BASH(ISH) STAGE TWO SCRIPTS TO DOWNLOAD AND START PAYLOADS ON TARGET VMs
     """

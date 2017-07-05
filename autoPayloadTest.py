@@ -1,4 +1,5 @@
 import sys
+from __builtin__ import False
 sys.path.insert(0, '../vm-automation')
 import os
 import workstationVm
@@ -595,7 +596,7 @@ def main():
     """
     THE FIRST FEW LINES OF THE STAGE ONE SCRIPT PREP THINGS
     """
-    
+
     fileId=0;
     for host in configData['MSF_HOSTS']:
         host['LISTEN_PORTS'] = []
@@ -606,6 +607,8 @@ def main():
         host['RC_PATH'] =               host['MSF_ARTIFACT_PATH'] + "/test_rc"
         host['COMMIT_FILE'] =           host['MSF_ARTIFACT_PATH'] + "/commit_tag_" + configData['TIMESTAMP']
         host ['SCRIPT_PATH'] =          host['MSF_ARTIFACT_PATH'] + "/test_scripts"
+        host['STAGE_THREE_LOGFILE'] =   host['SCRIPT_PATH'] + "/stageThreeLog.txt"
+        host['PCAP_FILE'] =             host['MSF_ARTIFACT_PATH'] + "/logfile.pcap"
         stageOneContent = "#!/bin/bash -l \n\n"
         stageOneContent = stageOneContent + "cd " + host['MSF_PATH'] + "\n"
         stageOneContent = stageOneContent + "git fetch upstream\n"
@@ -619,6 +622,8 @@ def main():
         stageOneContent = stageOneContent + "rm -rf " + host['MSF_PAYLOAD_PATH'] + "/*\n"
         stageOneContent = stageOneContent + "mkdir " + host['RC_PATH'] + "\n"
         stageOneContent = stageOneContent + "rm -rf " + host['RC_PATH'] + "/*\n"
+        stageOneContent = stageOneContent + "echo '" +host['PASSWORD']+ "' | sudo -S tcpdump -i any -s0 -nn -net 192.168.0.0/16 -w " + host['PCAP_FILE'] + "tcpdump.pcap &\n"
+        
         host['STAGE_ONE_SCRIPT'] = stageOneContent
         host['STAGE_THREE_SCRIPT'] = "#!/bin/bash -l\n\n" + "cd " + host['MSF_PATH'] + "\n"
     # MAKE THE REST OF THE STAGE ONE SCRIPT
@@ -666,7 +671,7 @@ def main():
             else:
                 sessionData['RC_IN_SCRIPT_NAME'] = sessionData['MSF_HOST']['RC_PATH'] + '/' + '-'.join(sessionData['MODULE']['NAME'].split('/')) + '_' + \
                                                     host['IP_ADDRESS'] + '_' + uniqueId + '.rc'
-            sessionData['RC_OUT_SCRIPT_NAME'] = sessionData['RC_IN_SCRIPT_NAME'] + '.log'
+            sessionData['RC_OUT_SCRIPT_NAME'] = sessionData['RC_IN_SCRIPT_NAME'] + '.txt'
             rcScriptContent = apt_shared.makeRcScript(configData['COMMAND_LIST'],
                                                       host, 
                                                       sessionData, 
@@ -676,7 +681,11 @@ def main():
                 and 'bind' in sessionData['PAYLOAD']['NAME'].lower() \
                 and sessionData['MODULE']['NAME'].lower() == 'exploit/multi/handler':
                     launchBind = './msfconsole -qr '+ sessionData['RC_IN_SCRIPT_NAME'] + ' > ' + sessionData['RC_OUT_SCRIPT_NAME'] + '&\n'
+                    logLaunch = "echo 'LAUNCHING " + sessionData['RC_IN_SCRIPT_NAME'] + "' >> " + sessionData['MSF_HOST']['STAGE_THREE_LOGFILE'] + '\n'
                     sessionData['MSF_HOST']['STAGE_THREE_SCRIPT'] = sessionData['MSF_HOST']['STAGE_THREE_SCRIPT'] + launchBind
+                    sessionData['MSF_HOST']['STAGE_THREE_SCRIPT'] = sessionData['MSF_HOST']['STAGE_THREE_SCRIPT'] + logLaunch
+                    logLaunch = "echo 'SUCCESSFULLY LAUNCHED " + sessionData['RC_IN_SCRIPT_NAME'] + "' >> " + sessionData['MSF_HOST']['STAGE_THREE_LOGFILE'] + '\n'
+                    sessionData['MSF_HOST']['STAGE_THREE_SCRIPT'] = sessionData['MSF_HOST']['STAGE_THREE_SCRIPT'] + logLaunch
                     sessionData['MSF_HOST']['STAGE_THREE_SCRIPT'] = sessionData['MSF_HOST']['STAGE_THREE_SCRIPT'] + "sleep 10\n"
             else:
                 stageOneContent = stageOneContent + './msfconsole -qr '+ \
@@ -691,8 +700,10 @@ def main():
     for msfHost in configData['MSF_HOSTS']:
         msfHost['STAGE_ONE_SCRIPT'] = msfHost['STAGE_ONE_SCRIPT'] + "cd " + msfHost['MSF_PAYLOAD_PATH'] + "/" + "\n"
         msfHost['STAGE_ONE_SCRIPT'] = msfHost['STAGE_ONE_SCRIPT'] + "python -m SimpleHTTPServer " + str(configData['HTTP_PORT']) + " &\n"
-        msfHost['STAGE_ONE_SCRIPT'] = msfHost['STAGE_ONE_SCRIPT'] + "while true; do\n"
-        msfHost['STAGE_ONE_SCRIPT'] = msfHost['STAGE_ONE_SCRIPT'] + "  netstat -ant > netstat.txt\n"
+        msfHost['STAGE_ONE_SCRIPT'] = msfHost['STAGE_ONE_SCRIPT'] + "echo '' > netstat.txt\n"
+        msfHost['STAGE_ONE_SCRIPT'] = msfHost['STAGE_ONE_SCRIPT'] + "for i in {1..50}; do\n"
+        # If you reset the file each time, there's a very god chance of getting empty files dring the write process.
+        msfHost['STAGE_ONE_SCRIPT'] = msfHost['STAGE_ONE_SCRIPT'] + "  netstat -ant >> netstat.txt\n"
         msfHost['STAGE_ONE_SCRIPT'] = msfHost['STAGE_ONE_SCRIPT'] + "  sleep 5\n"
         msfHost['STAGE_ONE_SCRIPT'] = msfHost['STAGE_ONE_SCRIPT'] + "done\n"
         try:
@@ -710,10 +721,13 @@ def main():
     """
     WAIT FOR THE STAGE ONE SCRIPT TO FINISH....
     
-    PREVIOUSLY, THIS LOOKED FOR THE stageOneScript IN THE PROCESS LIST
-    BUT FOR SOME REASON. THERE WAS AN ARTIFACT LEFT FOR SEVERAL SECONDS AFTER
-    THE PROCESS EXITED.  NOW, WE USE THE PYTHON HTTP SERVER AS THE BENCHMARK FOR
-    COMPLETION.
+    THERE ARE TWO PARTS TO DETECT THE COMPLETION OF STAGE ONE SCRIPTS:
+    (1) WAIT FOR THE PYTHON HTTP SERVER TO APPEAR ON TEH MSF_HOSTS, AS THAT IS THE LAST REQUIRED 
+    INSTRUCTION IN THE STAGE ONE SCRIPT.
+    (2) SINCE WE LAUNCH MSFCONSOLE IN THE BACKGROUND, MSFCONSOLE THE HTTP SERVER CAN APPEAR A FEW MINUTES BEFORE
+    THE REVERSE LISTENERS ACTUALLY START LISTENING.  TO MAKE SURE WE DO NOT LAUNCH THE REVERSE PAYLOADS BEFORE THE
+    REVERE HANDLERS ARE READY, THE REMOTE STAGE ONE SCRIPT HAS A FOR LOOP WHERE IT DUMPS THE NETSTAT OUTPUT TO A FILE.
+    THE LOCAL SCRIPT PULLS THAT FILE EVERY 5 SECONDS AND CHECKS TO SEE IF THE REVERSE LISTENERS HAVE STARTED.    
     """
     
     logMsg(configData['LOG_FILE'], "WAITING FOR STAGE ONE SCRIPT(S) TO COMPLETE...")
@@ -733,40 +747,48 @@ def main():
             if host['SCRIPT_COMPLETE'] == False:
                 scriptComplete = False
                 if modCounter % 5 == 0:
-                    logMsg(configData['LOG_FILE'], "PAYLOAD CREATION SCRIPT STILL RUNNING ON " + host['NAME'])
+                    logMsg(configData['LOG_FILE'], "WAITING FOR PYTHON HTTP SERVER TO START ON " + host['NAME'])
                 msfHost['VM_OBJECT'].updateProcList()
                 for procEntry in msfHost['VM_OBJECT'].procList:
                     if ('python' in procEntry.lower()) and (str(configData['HTTP_PORT']) in procEntry):
-                        logMsg(configData['LOG_FILE'], "PAYLOAD CREATION SCRIPT FINISHED ON " + host['NAME'])
+                        logMsg(configData['LOG_FILE'], "PYTHON HTTP SERVER FOUND ON " + host['NAME'])
                         logMsg(configData['LOG_FILE'], str(procEntry))
                         host['SCRIPT_COMPLETE'] = True
-    """
+                        
     for waitCycles in range(60):
-        logMsg(configData['LOG_FILE'], "CHECKING netstat OUTPUT")
-        remoteFile = host['MSF_PAYLOAD_PATH'] + "/netstat.txt"
         portPassed = True
-        for host in configData['MSF_HOSTS']:
-            localFile = configData['REPORT_DIR'] + "/" + host['NAME'] + "_netstat_" + str(waitCycles) + ".txt"
-            host['VM_OBJECT'].getFileFromGuest(remoteFile, localFile)
-            try:
-                netstatFile = open(localFile, 'r')
-                netstatData = netstatFile.read()
-                netstatFile.close()
-            except Exception as e:
-                logMsg(configData['LOG_FILE'], "FAILED READING NETSTAT FILE: " + localFile + "\n" + str(e))
-                netstatData = ""
-            for port in host['LISTEN_PORTS']:
-                if str(port) not in netstatData:
-                    portPassed = False
-                    logMsg(configData['LOG_FILE'], "PORT " + str(port) + " NOT OPEN ON " + host['NAME'] + "\n")
-        if portPassed == True:
-            break;    
         try:
+            logMsg(configData['LOG_FILE'], "CHECKING netstat OUTPUT")
+            remoteFile = host['MSF_PAYLOAD_PATH'] + "/netstat.txt"
+            for host in configData['MSF_HOSTS']:
+                if 0 == len(host['LISTEN_PORTS']):
+                    logMsg(configData['LOG_FILE'], "NO PORTS REQUIRED FOR " + host['NAME'] + "\n")
+                else:
+                    logMsg(configData['LOG_FILE'], "PORT " + str(host['LISTEN_PORTS']) + " SHOULD BE OPEN ON " + host['NAME'] + "\n")
+                    localFile = configData['REPORT_DIR'] + "/" + host['NAME'] + "_netstat_" + str(waitCycles) + ".txt"
+                    host['VM_OBJECT'].getFileFromGuest(remoteFile, localFile)
+                    try:
+                        netstatFile = open(localFile, 'r')
+                        netstatData = netstatFile.read()
+                        netstatFile.close()
+                    except Exception as e:
+                        logMsg(configData['LOG_FILE'], "FAILED READING NETSTAT FILE: " + localFile + "\n" + str(e))
+                        #IF WE DID NOT GET A  FILE, WE CANNOT SAY THAT THE PORTS ARE READY
+                        netstatData = ""
+                        portPassed = False
+                        pass
+                    for port in host['LISTEN_PORTS']:
+                        if str(port) not in netstatData:
+                            portPassed = False
+                            logMsg(configData['LOG_FILE'], "PORT " + str(port) + " NOT OPEN ON " + host['NAME'] + "\n")
+                        else:
+                            logMsg(configData['LOG_FILE'], "PORT " + str(port) + " IS OPEN ON " + host['NAME'] + "\n")
+            if portPassed == True:
+                break;    
             time.sleep(5)
         except KeyboardInterrupt:
             print "CAUGHT KEYBOARD INTERRUPT; ABORTING TEST AND RESETTING VMS...."
             bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
-    """
     
     logMsg(configData['LOG_FILE'], "WRITING JSON FILE")
     jsonOut = configData['REPORT_DIR'] + '/' + "test.json"
@@ -777,7 +799,7 @@ def main():
     except Exception as e:
         print "FAILED TO WRITE JSON FILE: " + jsonOut + "\n" + str(e)
     
-    waitCycles = 50
+    waitCycles = 3
     for i in range(waitCycles):
         logMsg(configData['LOG_FILE'], "SLEEPING FOR " + str((waitCycles-i)*10) + " SECONDS")
         try:
@@ -790,6 +812,7 @@ def main():
     """
     stageTwoWaitNeeded = False
     remoteInterpreter =     None
+    terminationToken = "!!! STAGE TWO COMPLETE !!!"
     for target in configData['TARGETS']:
         logMsg(configData['LOG_FILE'], "PROCESSING " + target['NAME'])
         if target['METHOD'] == 'VM_TOOLS_UPLOAD':
@@ -797,12 +820,15 @@ def main():
             escapedIp = 'x'.join(target['IP_ADDRESS'].split('.'))
             logMsg(configData['LOG_FILE'], "I THINK " + target['NAME'] + " HAS IP ADDRESS " + target['IP_ADDRESS'])
             if 'win' in target['NAME'].lower():
+                target['REMOTE_LOG'] = target['PAYLOAD_DIRECTORY'] + "\\stageTwoLog.txt"
                 target['STAGE_TWO_FILENAME'] = "stageTwoScript_" +  escapedIp + ".py"
                 remoteScriptName =  target['PAYLOAD_DIRECTORY'] + "\\" + target['STAGE_TWO_FILENAME']
                 localScriptName =   configData['SCRIPT_DIR'] + "/" + target['STAGE_TWO_FILENAME']
                 remoteInterpreter = target['PYTHON']
-                target['STAGE_TWO_SCRIPT'] = target['STAGE_TWO_SCRIPT'] + apt_shared.makeStageTwoPyScript(target, configData['HTTP_PORT'])
+                target['STAGE_TWO_SCRIPT'] = target['STAGE_TWO_SCRIPT'] + \
+                    apt_shared.makeStageTwoPyScript(target, configData['HTTP_PORT'], target['REMOTE_LOG'], terminationToken)
             else:
+                target['REMOTE_LOG'] = target['PAYLOAD_DIRECTORY'] + "/stageTwoLog.txt"
                 target['STAGE_TWO_FILENAME'] = configData['SCRIPT_DIR'] + '/' + "stageTwoScript_" +  escapedIp + ".sh"
                 remoteScriptName =  target['PAYLOAD_DIRECTORY'] + "/" + target['STAGE_TWO_FILENAME']
                 localScriptName =   configData['SCRIPT_DIR'] + "/" + target['STAGE_TWO_FILENAME']
@@ -822,8 +848,38 @@ def main():
         #####  ADD OTHER OPTIONS AS THEY BECOME USED..... THINKING MAYBE SCP_UPLOAD?
 
     """
-    WAIT FOR REMOTE SCRIPTS TO FINISH
+    KEEP PULLING AND CHECKING THE REMOTE STAGE TWO LOG UNTIL WE SEE THE TERMINATION TOKEN
     """
+    if stageTwoWaitNeeded:
+        for waitCycles in range(60):
+            stageTwoComplete = True
+            if target['METHOD'] == 'VM_TOOLS_UPLOAD':
+                try:
+                    for host in configData['TARGETS']:
+                        localFile = configData['REPORT_DIR'] + "/" + host['NAME'] + "_stageTwoLog_" + str(waitCycles) + ".txt"
+                        host['VM_OBJECT'].getFileFromGuest(host['REMOTE_LOG'], localFile)
+                        try:
+                            logFileObj = open(localFile, 'r')
+                            logData = logFileObj.read()
+                            logFileObj.close()
+                        except:
+                            logMsg(configData['LOG_FILE'], "FAILED READING REMOTE LOG FILE: " + localFile + "\n" + str(e))
+                            logData = ""
+                            pass
+                        if terminationToken not in logData:
+                            logMsg(configData['LOG_FILE'], "NO TERMINATION TOKEN IN LOGFILE ON " + host['NAME'] + "\n")
+                            stageTwoComplete = False
+                        else:
+                            logMsg(configData['LOG_FILE'], "TERMINATION TOKEN FOUND IN LOGFILE ON " + host['NAME'] + "\n")
+                            localFile = configData['REPORT_DIR'] + "/" + host['NAME'] + "_netstat_" + str(waitCycles) + ".txt"
+                    if stageTwoComplete == True:
+                        break;    
+                    time.sleep(5)
+                except KeyboardInterrupt:
+                    print "CAUGHT KEYBOARD INTERRUPT; ABORTING TEST AND RESETTING VMS...."
+                    bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
+
+    
     # HMMMMMMMMM, WELL, WHICH TARGET HAS THE MOST PAYLOADS TO RUN?
     if stageTwoWaitNeeded:
         maxPayloads = 0
@@ -832,11 +888,15 @@ def main():
                 if maxPayloads < len(target['PAYLOADS']):
                     maxPayloads = len(target['PAYLOADS'])
         timeToSleep = 60 + 5 * maxPayloads
-        for i in range(timeToSleep):
-            if i % 10 == 0:
-                logMsg(configData['LOG_FILE'], "WAITING " + str(timeToSleep - i) + " SECONDS FOR STAGE TWO SCRIPT TO FINISH")
-            time.sleep(1)
-        logMsg(configData['LOG_FILE'], "WAKING UP")
+        try:
+            for i in range(timeToSleep):
+                if i % 10 == 0:
+                    logMsg(configData['LOG_FILE'], "WAITING " + str(timeToSleep - i) + " SECONDS FOR STAGE TWO SCRIPT TO FINISH")
+                time.sleep(1)
+            logMsg(configData['LOG_FILE'], "WAKING UP")
+        except KeyboardInterrupt:
+            print "CAUGHT KEYBOARD INTERRUPT; SKIPPING THE WAIT...."
+            pass;
     else:
         logMsg(configData['LOG_FILE'], "NO STAGE TWO SCRIPTS UPLOADED..... NOTHING TO SEE HERE; MOVE ALONG")
         
@@ -892,6 +952,14 @@ def main():
         print "CAUGHT KEYBOARD INTERRUPT; SKIPPING THE WAIT...."
         
     """
+    PULL STAGE THREE LOG FILES FROM MSF VMS
+    """
+    for msfHost in configData['MSF_HOSTS']:
+        remoteFileName = msfHost['STAGE_THREE_LOGFILE']
+        localFileName = configData['REPORT_DIR'] + '/' + msfHost['NAME'] + "_stageThreeLog.txt"
+        msfHost['VM_OBJECT'].getFileFromGuest(remoteFileName, localFileName)
+        
+    """
     PULL REPORT FILES FROM EACH TEST VM
     """
     for target in configData['TARGETS']:
@@ -915,9 +983,13 @@ def main():
     logMsg(configData['LOG_FILE'], "FINISHED DOWNLOADING REPORTS")
     
     """
-    GET COMMIT VERSION
+    GET COMMIT VERSION AND PCAPS
     """
     for msfHost in configData['MSF_HOSTS']:
+        msfHost['VM_OBJECT'].runCmdOnGuest(['/usr/bin/killall', 'tcpdump'])
+        srcFile = msfHost['PCAP_FILE']
+        dstFile = configData['REPORT_DIR'] + "/" + msfHost['NAME'] + ".pcap"
+        msfHost['VM_OBJECT'].getFileFromGuest(srcFile, dstFile)
         srcFile = msfHost['COMMIT_FILE']
         dstFile = configData['REPORT_DIR'] + "/commit_" + '-'.join(msfHost['IP_ADDRESS'].split('.')) + ".txt"
         msfHost['VM_OBJECT'].getFileFromGuest(srcFile, dstFile)

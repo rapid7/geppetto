@@ -622,7 +622,7 @@ def main():
         stageOneContent = stageOneContent + "rm -rf " + host['MSF_PAYLOAD_PATH'] + "/*\n"
         stageOneContent = stageOneContent + "mkdir " + host['RC_PATH'] + "\n"
         stageOneContent = stageOneContent + "rm -rf " + host['RC_PATH'] + "/*\n"
-        stageOneContent = stageOneContent + "echo '" +host['PASSWORD']+ "' | sudo -S tcpdump -i any -s0 -nn -net 192.168.0.0/16 -w " + host['PCAP_FILE'] + "tcpdump.pcap &\n"
+        stageOneContent = stageOneContent + "echo '" +host['PASSWORD']+ "' | sudo -S tcpdump -i any -s0 -nn net 192.168.0.0/16 -w " + host['PCAP_FILE'] + " &\n"
         
         host['STAGE_ONE_SCRIPT'] = stageOneContent
         host['STAGE_THREE_SCRIPT'] = "#!/bin/bash -l\n\n" + "cd " + host['MSF_PATH'] + "\n"
@@ -989,6 +989,7 @@ def main():
         msfHost['VM_OBJECT'].runCmdOnGuest(['/usr/bin/killall', 'tcpdump'])
         srcFile = msfHost['PCAP_FILE']
         dstFile = configData['REPORT_DIR'] + "/" + msfHost['NAME'] + ".pcap"
+        msfHost['LOCAL_PCAP'] = dstFile
         msfHost['VM_OBJECT'].getFileFromGuest(srcFile, dstFile)
         srcFile = msfHost['COMMIT_FILE']
         dstFile = configData['REPORT_DIR'] + "/commit_" + '-'.join(msfHost['IP_ADDRESS'].split('.')) + ".txt"

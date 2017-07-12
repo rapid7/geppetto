@@ -160,9 +160,15 @@ def makeRcScript(cmdList, targetData, sessionData, logFile):
     rcScriptContent = rcScriptContent + "echo '    end' >> " + rcScriptName + '\n'
     rcScriptContent = rcScriptContent + "echo '    sleep(5)' >> " + rcScriptName + '\n'
     rcScriptContent = rcScriptContent + "echo '</ruby>' >> " + rcScriptName + '\n'
+    addSleep = True
     for i in cmdList:
-        rcScriptContent = rcScriptContent + rubySleep
         rcScriptContent = rcScriptContent + "echo '" + i + "' >> " + rcScriptName + '\n'
+        if "<ruby>" in i.lower():
+            addSleep = False
+        if "</ruby>" in i.lower():
+            addSleep = True
+        if addSleep:
+            rcScriptContent = rcScriptContent + rubySleep
     rcScriptContent = rcScriptContent + "echo 'exit -y' >> " + rcScriptName + '\n'
     return rcScriptContent    
 

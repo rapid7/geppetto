@@ -117,7 +117,8 @@ def makeVenomCmd(targetData, sessionData, portTracker, logFile):
     logMsg(logFile, "msfvenom cmd = " + msfVenomCmd)
     return msfVenomCmd
 
-def makeRcScript(cmdList, targetData, sessionData, logFile):
+
+def makeRcScript(cmdList, targetData, sessionData, logFile, portNum):
     if 'PAYLOAD' in sessionData:
         payloadName = sessionData['PAYLOAD']['NAME']
     else:
@@ -162,6 +163,10 @@ def makeRcScript(cmdList, targetData, sessionData, logFile):
     rcScriptContent = rcScriptContent + "echo '</ruby>' >> " + rcScriptName + '\n'
     addSleep = True
     for i in cmdList:
+        if 'UNIQUE_PORT' in i:
+            i = i.replace("UNIQUE_PORT", str(portNum.get()), 1)
+        if 'MSF_IP' in i:
+            i = i.replace("MSF_IP", sessionData['MSF_HOST']['IP_ADDRESS'], 1)
         rcScriptContent = rcScriptContent + "echo '" + i + "' >> " + rcScriptName + '\n'
         if "<ruby>" in i.lower():
             addSleep = False

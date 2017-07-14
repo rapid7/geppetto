@@ -675,7 +675,8 @@ def main():
             rcScriptContent = apt_shared.makeRcScript(configData['COMMAND_LIST'],
                                                       host, 
                                                       sessionData, 
-                                                      configData['LOG_FILE'])
+                                                      configData['LOG_FILE'],
+                                                      portNum)
             stageOneContent = stageOneContent + rcScriptContent + '\n'
             if 'PAYLOAD' in sessionData \
                 and 'bind' in sessionData['PAYLOAD']['NAME'].lower() \

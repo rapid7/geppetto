@@ -1,10 +1,8 @@
 import sys
 from __builtin__ import False
-sys.path.insert(0, '../vm-automation')
 import os
-import workstationVm
 import apt_shared
-import esxiVm
+import vm_automation
 from datetime import datetime
 
 import time

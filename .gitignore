@@ -4,6 +4,9 @@
 # ignore config files
 config/
 
+# ignore common editor files
+/.idea/
+
 # ignore output files
 test_data/
 

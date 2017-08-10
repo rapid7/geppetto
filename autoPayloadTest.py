@@ -94,9 +94,9 @@ def createServer(configFile, logFile = "default.log"):
         print "INVALID CONFIG FILE; NO HYPERVISOR_TYPE FOUND"
         return None
     if hypervisorDic['HYPERVISOR_TYPE'].lower() == "esxi":
-        return esxiVm.createFromConfig(hypervisorDic, logFile)
+        return vm_automation.esxiServer.createFromConfig(hypervisorDic, logFile)
     if hypervisorDic['HYPERVISOR_TYPE'].lower() == "workstation":
-        return workstationVm.workstationServer(hypervisorDic, logFile)
+        return vm_automation.workstationServer(hypervisorDic, logFile)
 
 def expandGlobalList(hostList, globalList, listName):
     for target in hostList:

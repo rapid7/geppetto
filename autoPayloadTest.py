@@ -614,6 +614,9 @@ def main():
         stageOneContent = stageOneContent + "git clean -df\n"
         stageOneContent = stageOneContent + "git checkout " + configData['FRAMEWORK_BRANCH'] + "\n"
         stageOneContent = stageOneContent + "git log | head -n 1 > " + host['COMMIT_FILE'] + "\n"
+        stageOneContent = stageOneContent + "source ~/.rvm/scripts/rvm\n"
+        stageOneContent = stageOneContent + "cd " + host['MSF_PATH'] + "\n"
+        stageOneContent = stageOneContent + "rvm --install $(cat .ruby-version)\n"
         stageOneContent = stageOneContent + "gem install bundler\n"
         stageOneContent = stageOneContent + "bundle install\n"
         stageOneContent = stageOneContent + "mkdir " + host['MSF_PAYLOAD_PATH'] + "\n"
@@ -623,7 +626,14 @@ def main():
         stageOneContent = stageOneContent + "echo '" +host['PASSWORD']+ "' | sudo -S tcpdump -i any -s0 -nn net 192.168.0.0/16 -w " + host['PCAP_FILE'] + " &\n"
         
         host['STAGE_ONE_SCRIPT'] = stageOneContent
-        host['STAGE_THREE_SCRIPT'] = "#!/bin/bash -l\n\n" + "cd " + host['MSF_PATH'] + "\n"
+        host['STAGE_THREE_SCRIPT'] = "#!/bin/bash -l\n\n"
+        host['STAGE_THREE_SCRIPT'] = host['STAGE_THREE_SCRIPT'] + "cd " + host['MSF_PATH'] + "\n"
+        host['STAGE_THREE_SCRIPT'] = host['STAGE_THREE_SCRIPT'] + "source ~/.rvm/scripts/rvm\n"
+        host['STAGE_THREE_SCRIPT'] = host['STAGE_THREE_SCRIPT'] + "cd " + host['MSF_PATH'] + "\n"
+        host['STAGE_THREE_SCRIPT'] = host['STAGE_THREE_SCRIPT'] + "rvm --install $(cat .ruby-version)\n"
+        host['STAGE_THREE_SCRIPT'] = host['STAGE_THREE_SCRIPT'] + "gem install bundler\n"
+        host['STAGE_THREE_SCRIPT'] = host['STAGE_THREE_SCRIPT'] + "bundle install\n"
+
     # MAKE THE REST OF THE STAGE ONE SCRIPT
     sleepBreak = "\nsleep(2)\n"
     sessionCounter = 0
@@ -920,13 +930,13 @@ def main():
     """
     WAIT FOR THE METERPRETER SESSIONS TO FINISH....
     """
-    logMsg(configData['LOG_FILE'], "WAITING FOR MSFCONSOLE TO FINISH...")
-    time.sleep(10)
+    logMsg(configData['LOG_FILE'], "WAITING FOR MSFCONSOLES TO LAUNCH...")
+    time.sleep(20)
     modCounter = 0
     msfDone = False
     loopCounter = 0
     msfConsoleCount = 1
-    maxLoops = sessionCounter * 3 + 30
+    maxLoops = sessionCounter * 5 + 30
     try:
         while msfConsoleCount != 0:
             msfConsoleCount = 0

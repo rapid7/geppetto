@@ -167,6 +167,8 @@ def makeRcScript(cmdList, targetData, sessionData, logFile, portNum):
             i = i.replace("UNIQUE_PORT", str(portNum.get()), 1)
         if 'MSF_IP' in i:
             i = i.replace("MSF_IP", sessionData['MSF_HOST']['IP_ADDRESS'], 1)
+        if 'TARGET_IP' in i:
+            i = i.replace("TARGET_IP", targetData['IP_ADDRESS'], 1)
         rcScriptContent = rcScriptContent + "echo '" + i + "' >> " + rcScriptName + '\n'
         if "<ruby>" in i.lower():
             addSleep = False

@@ -823,6 +823,7 @@ def main():
     remoteInterpreter =     None
     terminationToken = "!!! STAGE TWO COMPLETE !!!"
     secDelay = 120
+    addScheduleDelay = False
     for target in configData['TARGETS']:
         logMsg(configData['LOG_FILE'], "PROCESSING " + target['NAME'])
         if target['METHOD'] == 'VM_TOOLS_UPLOAD':
@@ -852,14 +853,19 @@ def main():
             except IOError as e:
                 logMsg(configData['LOG_FILE'], "[ERROR] FAILED TO WRITE TO FILE " + localScriptName + str(e))
                 bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
-#            if not target['VM_OBJECT'].uploadAndRun(localScriptName, remoteScriptName, remoteInterpreter):
-            if target['VM_OBJECT'].uploadAndSchedule(localScriptName, remoteScriptName, secDelay, remoteInterpreter):
-                logMsg(configData['LOG_FILE'], "[INFO]: SUCCESSFULLY SCHEDULED " + localScriptName + " ON " + target['VM_OBJECT'].vmName)
+            if 'win' in target['NAME'].lower():
+                addScheduleDelay = True
+                launchResult = target['VM_OBJECT'].uploadAndSchedule(localScriptName, remoteScriptName, secDelay, remoteInterpreter)
+            else:
+                launchResult = target['VM_OBJECT'].uploadAndRun(localScriptName, remoteScriptName, remoteInterpreter)
+            if launchResult:
+                logMsg(configData['LOG_FILE'], "[INFO]: SUCCESSFULLY LAUNCHED " + localScriptName + " ON " + target['VM_OBJECT'].vmName)
             else:
                 logMsg(configData['LOG_FILE'], "[FATAL ERROR]: FAILED TO UPLOAD/EXECUTE " + localScriptName + " ON " + target['VM_OBJECT'].vmName)
                 bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
-    logMsg(configData['LOG_FILE'], "[INFO]: SLEEPING FOR " + str(secDelay + 60) + " TO ALLOW SCEDULED TASKS TO START")
-    time.sleep(secDelay + 60)
+    if addScheduleDelay:
+        logMsg(configData['LOG_FILE'], "[INFO]: SLEEPING FOR " + str(secDelay + 60) + " TO ALLOW SCEDULED TASKS TO START")
+        time.sleep(secDelay + 60)
     
         #####  ADD OTHER OPTIONS AS THEY BECOME USED..... THINKING MAYBE SCP_UPLOAD?
 

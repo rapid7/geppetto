@@ -57,11 +57,11 @@ def makeHtmlReport(targetData, msfHosts):
         for sessionData in host['SESSION_DATASETS']:
             payloadFileName = "NO PAYLOAD FILE"
             payloadName = "NO PAYLOAD (AUX?)"
+            interpreter = ""            
             if 'PAYLOAD' in sessionData:
                 payloadName = sessionData['PAYLOAD']['NAME'].lower()
                 if 'FILENAME' in sessionData['PAYLOAD']:
                     payloadFileName = sessionData['PAYLOAD']['FILENAME']
-                interpreter = ""
                 if 'java' in payloadName:
                     interpreter = "<br>" + host['METERPRETER_JAVA']
                 if 'python' in payloadName:
@@ -117,6 +117,18 @@ def makeVenomCmd(targetData, sessionData, portTracker, logFile):
     logMsg(logFile, "msfvenom cmd = " + msfVenomCmd)
     return msfVenomCmd
 
+def replaceWildcards(originalString, targetData, sessionData, portNum):
+    if 'UNIQUE_PORT' in originalString:
+        originalString = originalString.replace("UNIQUE_PORT", str(portNum.get()), 1)
+    if 'MSF_IP' in originalString:
+        originalString = originalString.replace("MSF_IP", sessionData['MSF_HOST']['IP_ADDRESS'], 1)
+    if 'TARGET_IP' in originalString:
+        originalString = originalString.replace("TARGET_IP", targetData['IP_ADDRESS'], 1)
+    if 'TARGET_USERNAME' in originalString:
+        originalString = originalString.replace("TARGET_USERNAME", targetData['USERNAME'], 1)
+    if 'TARGET_PASSWORD' in originalString:
+        originalString = originalString.replace("TARGET_PASSWORD", targetData['PASSWORD'], 1)
+    return originalString
 
 def makeRcScript(cmdList, targetData, sessionData, logFile, portNum):
     if 'PAYLOAD' in sessionData:
@@ -138,10 +150,9 @@ def makeRcScript(cmdList, targetData, sessionData, logFile, portNum):
         rcScriptContent = rcScriptContent + "echo 'set RHOST " + targetData['IP_ADDRESS'] + " ' >> " + rcScriptName + "\n"
         rcScriptContent = rcScriptContent + "echo 'set RHOSTS " + targetData['IP_ADDRESS'] + " ' >> " + rcScriptName + "\n"
     for settingItem in sessionData['MODULE']['SETTINGS']:
-        rcScriptContent = rcScriptContent + "echo 'set " + settingItem.split('=')[0] + ' ' + settingItem.split('=')[1] + "' >> " + rcScriptName + '\n'
-    for settingEntry in sessionData['MODULE']['SETTINGS']:
-        if '=' in settingEntry:
-            strSetting = "SET " + settingEntry.split('=')[0] + " " + settingEntry.split('=')[1]
+        processedString = replaceWildcards(settingItem, targetData, sessionData, portNum)
+        if '=' in processedString:
+            rcScriptContent = rcScriptContent + "echo 'set " + processedString.split('=')[0] + ' ' + processedString.split('=')[1] + "' >> " + rcScriptName + '\n'
     if 'PAYLOAD' in sessionData:
         rcScriptContent = rcScriptContent + "echo 'set payload " + sessionData['PAYLOAD']['NAME'] +"' >> " + rcScriptName + '\n'
         for settingItem in sessionData['PAYLOAD']['SETTINGS']:
@@ -152,27 +163,30 @@ def makeRcScript(cmdList, targetData, sessionData, logFile, portNum):
         if 'reverse' in sessionData['PAYLOAD']['NAME']:
             rcScriptContent = rcScriptContent + "echo 'set LHOST " + sessionData['MSF_HOST']['IP_ADDRESS'] + "' >> " + rcScriptName + '\n'
             rcScriptContent = rcScriptContent + "echo 'set LPORT " + str(sessionData['PAYLOAD']['PRIMARY_PORT']) + "' >> " + rcScriptName + '\n'
-    rcScriptContent = rcScriptContent + "echo 'show options' >> " + rcScriptName + '\n'
-    rcScriptContent = rcScriptContent + rubySleep
-    rcScriptContent = rcScriptContent + "echo 'run -z' >> " + rcScriptName + '\n'
-    rcScriptContent = rcScriptContent + "echo '<ruby>' >> " + rcScriptName + '\n'
-    rcScriptContent = rcScriptContent + "echo '    while framework.sessions.count == 0 do '>> " + rcScriptName + '\n'
-    rcScriptContent = rcScriptContent + "echo '        sleep(1)' >> " + rcScriptName + '\n'
-    rcScriptContent = rcScriptContent + "echo '    end' >> " + rcScriptName + '\n'
-    rcScriptContent = rcScriptContent + "echo '    sleep(5)' >> " + rcScriptName + '\n'
-    rcScriptContent = rcScriptContent + "echo '</ruby>' >> " + rcScriptName + '\n'
+        rcScriptContent = rcScriptContent + "echo 'show options' >> " + rcScriptName + '\n'
+        rcScriptContent = rcScriptContent + rubySleep
+        rcScriptContent = rcScriptContent + "echo 'run -z' >> " + rcScriptName + '\n'
+        rcScriptContent = rcScriptContent + "echo '<ruby>' >> " + rcScriptName + '\n'
+        rcScriptContent = rcScriptContent + "echo '    while framework.sessions.count == 0 do '>> " + rcScriptName + '\n'
+        rcScriptContent = rcScriptContent + "echo '        sleep(1)' >> " + rcScriptName + '\n'
+        rcScriptContent = rcScriptContent + "echo '    end' >> " + rcScriptName + '\n'
+        rcScriptContent = rcScriptContent + "echo '    sleep(30)' >> " + rcScriptName + '\n'
+        rcScriptContent = rcScriptContent + "echo '</ruby>' >> " + rcScriptName + '\n'
+    else:
+        rcScriptContent = rcScriptContent + "echo 'show options' >> " + rcScriptName + '\n'
+        rcScriptContent = rcScriptContent + rubySleep
+        rcScriptContent = rcScriptContent + "echo 'run -z' >> " + rcScriptName + '\n'
+        rcScriptContent = rcScriptContent + "echo '<ruby>' >> " + rcScriptName + '\n'
+        rcScriptContent = rcScriptContent + "echo '  sleep(10)' >> " + rcScriptName + '\n'
+        rcScriptContent = rcScriptContent + "echo '</ruby>' >> " + rcScriptName + '\n'
+        
     addSleep = True
-    for i in cmdList:
-        if 'UNIQUE_PORT' in i:
-            i = i.replace("UNIQUE_PORT", str(portNum.get()), 1)
-        if 'MSF_IP' in i:
-            i = i.replace("MSF_IP", sessionData['MSF_HOST']['IP_ADDRESS'], 1)
-        if 'TARGET_IP' in i:
-            i = i.replace("TARGET_IP", targetData['IP_ADDRESS'], 1)
-        rcScriptContent = rcScriptContent + "echo '" + i + "' >> " + rcScriptName + '\n'
-        if "<ruby>" in i.lower():
+    for cmd in cmdList:
+        processedCmd = replaceWildcards(cmd, targetData, sessionData, portNum)
+        rcScriptContent = rcScriptContent + "echo '" + processedCmd + "' >> " + rcScriptName + '\n'
+        if "<ruby>" in processedCmd.lower():
             addSleep = False
-        if "</ruby>" in i.lower():
+        if "</ruby>" in processedCmd.lower():
             addSleep = True
         if addSleep:
             rcScriptContent = rcScriptContent + rubySleep

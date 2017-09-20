@@ -826,8 +826,10 @@ def main():
     addScheduleDelay = False
     for target in configData['TARGETS']:
         logMsg(configData['LOG_FILE'], "PROCESSING " + target['NAME'])
+        for sessionData in target['SESSION_DATASETS']:
+            if 'PAYLOAD' in sessionData:
+                stageTwoWaitNeeded = True
         if target['METHOD'] == 'VM_TOOLS_UPLOAD':
-            stageTwoWaitNeeded = True
             escapedIp = 'x'.join(target['IP_ADDRESS'].split('.'))
             logMsg(configData['LOG_FILE'], "I THINK " + target['NAME'] + " HAS IP ADDRESS " + target['IP_ADDRESS'])
             if 'win' in target['NAME'].lower():

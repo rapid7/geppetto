@@ -548,7 +548,7 @@ def main():
         if host['TYPE'] == 'VIRTUAL':
             host['VM_OBJECT'].getSnapshots()
             host['VM_OBJECT'].powerOn(False)
-            time.sleep(5)
+            time.sleep(2)
 
     """
     WAIT FOR THE VMS TO BE READY
@@ -565,6 +565,7 @@ def main():
         for host in configData['TARGETS'] + configData['MSF_HOSTS']:
             if host['TYPE'] == 'VIRTUAL' and 'IP_ADDRESS' not in host:
                 host['IP_ADDRESS'] = host['VM_OBJECT'].getVmIp()
+                logMsg(configData['LOG_FILE'], host['NAME'] + " IP ADDRESS = " + host['IP_ADDRESS'])
 
     """
     CREATE REQUIRED DIRECTORY FOR PAYLOADS ON VM_TOOLS MANAGED MACHINES
@@ -660,7 +661,6 @@ def main():
             stageOneContent = stageOneContent + '# TARGET:   ' + host['IP_ADDRESS'] + '\n'
             stageOneContent = stageOneContent + '# MSF_HOST: ' + sessionData['MSF_HOST']['IP_ADDRESS'] + '\n'
             stageOneContent = stageOneContent + '#\n'
-#            stageOneContent = stageOneContent + '#sleep 5\n'
             if sessionData['MODULE']['NAME'].lower() == 'exploit/multi/handler':
                 # WE NEED TO ADD THE MSFVENOM COMMAND TO MAKE THE PAYLOAD TO THE STAGE ONE SCRIPT
                 sessionData['PAYLOAD']['FILENAME'] =    '-'.join(sessionData['PAYLOAD']['NAME'].split('/')) + \
@@ -765,13 +765,17 @@ def main():
                         host['SCRIPT_COMPLETE'] = True
                         
     for waitCycles in range(60):
-        portPassed = True
+        stageTwoComplete = True
         try:
             logMsg(configData['LOG_FILE'], "CHECKING netstat OUTPUT")
             remoteFile = host['MSF_PAYLOAD_PATH'] + "/netstat.txt"
             for host in configData['MSF_HOSTS']:
+                hostReady = True
                 if 0 == len(host['LISTEN_PORTS']):
                     logMsg(configData['LOG_FILE'], "NO PORTS REQUIRED FOR " + host['NAME'] + "\n")
+                    host['READY'] = True
+                if 'READY' in host and host['READY'] == True:
+                    logMsg(configData['LOG_FILE'], "ALL REQUIRED PORTS READY ON " + host['NAME'] + "\n")
                 else:
                     logMsg(configData['LOG_FILE'], "PORT " + str(host['LISTEN_PORTS']) + " SHOULD BE OPEN ON " + host['NAME'] + "\n")
                     localFile = configData['REPORT_DIR'] + "/" + host['NAME'] + "_netstat_" + str(waitCycles) + ".txt"
@@ -784,15 +788,16 @@ def main():
                         logMsg(configData['LOG_FILE'], "FAILED READING NETSTAT FILE: " + localFile + "\n" + str(e))
                         #IF WE DID NOT GET A  FILE, WE CANNOT SAY THAT THE PORTS ARE READY
                         netstatData = ""
-                        portPassed = False
                         pass
                     for port in host['LISTEN_PORTS']:
                         if str(port) not in netstatData:
-                            portPassed = False
+                            hostReady = False
                             logMsg(configData['LOG_FILE'], "PORT " + str(port) + " NOT OPEN ON " + host['NAME'] + "\n")
                         else:
                             logMsg(configData['LOG_FILE'], "PORT " + str(port) + " IS OPEN ON " + host['NAME'] + "\n")
-            if portPassed == True:
+                    if hostReady == False:
+                        stageTwoComplete = False
+            if stageTwoComplete == True:
                 break;    
             time.sleep(5)
         except KeyboardInterrupt:
@@ -822,7 +827,7 @@ def main():
     stageTwoWaitNeeded = False
     remoteInterpreter =     None
     terminationToken = "!!! STAGE TWO COMPLETE !!!"
-    secDelay = 120
+    secDelay = 180
     addScheduleDelay = False
     for target in configData['TARGETS']:
         logMsg(configData['LOG_FILE'], "PROCESSING " + target['NAME'])
@@ -866,8 +871,8 @@ def main():
                 logMsg(configData['LOG_FILE'], "[FATAL ERROR]: FAILED TO UPLOAD/EXECUTE " + localScriptName + " ON " + target['VM_OBJECT'].vmName)
                 bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
     if addScheduleDelay:
-        logMsg(configData['LOG_FILE'], "[INFO]: SLEEPING FOR " + str(secDelay + 60) + " TO ALLOW SCEDULED TASKS TO START")
-        time.sleep(secDelay + 60)
+        logMsg(configData['LOG_FILE'], "[INFO]: SLEEPING FOR " + str(secDelay + 60) + " TO ALLOW SCHEDULED TASKS TO START")
+        time.sleep(secDelay + 20)
     
         #####  ADD OTHER OPTIONS AS THEY BECOME USED..... THINKING MAYBE SCP_UPLOAD?
 
@@ -880,22 +885,26 @@ def main():
             if target['METHOD'] == 'VM_TOOLS_UPLOAD':
                 try:
                     for host in configData['TARGETS']:
-                        localFile = configData['REPORT_DIR'] + "/" + host['NAME'] + "_stageTwoLog_" + str(waitCycles) + ".txt"
-                        host['VM_OBJECT'].getFileFromGuest(host['REMOTE_LOG'], localFile)
-                        try:
-                            logFileObj = open(localFile, 'r')
-                            logData = logFileObj.read()
-                            logFileObj.close()
-                        except:
-                            logMsg(configData['LOG_FILE'], "FAILED READING REMOTE LOG FILE: " + localFile + "\n" + str(e))
-                            logData = ""
-                            pass
-                        if terminationToken not in logData:
-                            logMsg(configData['LOG_FILE'], "NO TERMINATION TOKEN IN LOGFILE ON " + host['NAME'] + "\n")
-                            stageTwoComplete = False
+                        if 'TERMINATION_TOKEN' not in host:
+                            localFile = configData['REPORT_DIR'] + "/" + host['NAME'] + "_stageTwoLog_" + str(waitCycles) + ".txt"
+                            host['VM_OBJECT'].getFileFromGuest(host['REMOTE_LOG'], localFile)
+                            try:
+                                logFileObj = open(localFile, 'r')
+                                logData = logFileObj.read()
+                                logFileObj.close()
+                            except:
+                                logMsg(configData['LOG_FILE'], "FAILED READING REMOTE LOG FILE: " + localFile + "\n" + str(e))
+                                logData = ""
+                                pass
+                            if terminationToken not in logData:
+                                logMsg(configData['LOG_FILE'], "NO TERMINATION TOKEN IN LOGFILE ON " + host['NAME'] + "\n")
+                                stageTwoComplete = False
+                            else:
+                                logMsg(configData['LOG_FILE'], "TERMINATION TOKEN FOUND IN LOGFILE ON " + host['NAME'] + "\n")
+                                localFile = configData['REPORT_DIR'] + "/" + host['NAME'] + "_netstat_" + str(waitCycles) + ".txt"
+                                host['TERMINATION_TOKEN'] = True
                         else:
-                            logMsg(configData['LOG_FILE'], "TERMINATION TOKEN FOUND IN LOGFILE ON " + host['NAME'] + "\n")
-                            localFile = configData['REPORT_DIR'] + "/" + host['NAME'] + "_netstat_" + str(waitCycles) + ".txt"
+                            logMsg(configData['LOG_FILE'], "ALREADY FOUND TERMINATION TOKEN ON " + host['NAME'] + "\n")
                     if stageTwoComplete == True:
                         break;    
                     time.sleep(5)

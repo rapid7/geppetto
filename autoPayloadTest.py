@@ -613,7 +613,23 @@ def main():
         stageOneContent = stageOneContent + "git fetch upstream\n"
         stageOneContent = stageOneContent + "git reset --hard FETCH_HEAD\n"
         stageOneContent = stageOneContent + "git clean -df\n"
-        stageOneContent = stageOneContent + "git checkout " + configData['FRAMEWORK_BRANCH'] + "\n"
+        branchData = configData['FRAMEWORK_BRANCH'].split('/')
+        if branchData[0] == 'upstream':
+            #STANDARD BRANCH
+            stageOneContent = stageOneContent + "git checkout " + configData['FRAMEWORK_BRANCH'] + "\n"
+        else:
+            # THIS IS A NON_STANDARD REPO....
+            logMsg(configData['LOG_FILE'], "NONSTANDARD FRAMEWORK REPO DETECTED: " + configData['FRAMEWORK_BRANCH'])
+            userName = branchData[0]
+            logMsg(configData['LOG_FILE'], "NONSTANDARD FRAMEWORK USERNAME: " + userName)
+            repoName = branchData[1]
+            logMsg(configData['LOG_FILE'], "NONSTANDARD FRAMEWORK REPO NAME: " + repoName)
+            branchName = branchData[2]
+            logMsg(configData['LOG_FILE'], "NONSTANDARD FRAMEWORK BRANCH NAME: " + branchName)
+            gitSyntax = "https://github.com/" + userName + "/" + repoName + ".git"
+            stageOneContent = stageOneContent + "git remote add " + userName + " " + gitSyntax + "\n"
+            stageOneContent = stageOneContent + "git fetch  " + userName + "\n"
+            stageOneContent = stageOneContent + "git checkout -b  " + branchName + ' ' + userName + '/' + branchName + "\n"
         stageOneContent = stageOneContent + "git log | head -n 1 > " + host['COMMIT_FILE'] + "\n"
         stageOneContent = stageOneContent + "source ~/.rvm/scripts/rvm\n"
         stageOneContent = stageOneContent + "cd " + host['MSF_PATH'] + "\n"
@@ -797,6 +813,8 @@ def main():
                             logMsg(configData['LOG_FILE'], "PORT " + str(port) + " IS OPEN ON " + host['NAME'] + "\n")
                     if hostReady == False:
                         stageTwoComplete = False
+                    else:
+                        host['READY'] = True
             if stageTwoComplete == True:
                 break;    
             time.sleep(5)

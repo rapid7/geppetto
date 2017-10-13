@@ -741,20 +741,26 @@ def main():
         remoteStageOneScriptName = msfHost['SCRIPT_PATH'] + '/stageOneScript.sh'
         msfHost['VM_OBJECT'].makeDirOnGuest(msfHost['MSF_ARTIFACT_PATH'])
         msfHost['VM_OBJECT'].makeDirOnGuest(msfHost['SCRIPT_PATH'])
+    """
+    RUN STAGE ONE SCRIPTS
+    """
         msfHost['VM_OBJECT'].uploadAndRun(msfHost['STAGE_ONE_FILENAME'], remoteStageOneScriptName)
     
     """
     WAIT FOR THE STAGE ONE SCRIPT TO FINISH....
     
     THERE ARE TWO PARTS TO DETECT THE COMPLETION OF STAGE ONE SCRIPTS:
-    (1) WAIT FOR THE PYTHON HTTP SERVER TO APPEAR ON TEH MSF_HOSTS, AS THAT IS THE LAST REQUIRED 
-    INSTRUCTION IN THE STAGE ONE SCRIPT.
-    (2) SINCE WE LAUNCH MSFCONSOLE IN THE BACKGROUND, MSFCONSOLE THE HTTP SERVER CAN APPEAR A FEW MINUTES BEFORE
-    THE REVERSE LISTENERS ACTUALLY START LISTENING.  TO MAKE SURE WE DO NOT LAUNCH THE REVERSE PAYLOADS BEFORE THE
-    REVERE HANDLERS ARE READY, THE REMOTE STAGE ONE SCRIPT HAS A FOR LOOP WHERE IT DUMPS THE NETSTAT OUTPUT TO A FILE.
-    THE LOCAL SCRIPT PULLS THAT FILE EVERY 5 SECONDS AND CHECKS TO SEE IF THE REVERSE LISTENERS HAVE STARTED.    
+    THE LAST INSTRUCTION IN THE STAGE ONE SCRIPT IS TO START AN HTTP SERVER TO PROVIDE PAYLOADS, SO WE WAIT UNTIL 
+    THE HTTP PROCESS APPEARS.  UNFORUNATELY, MSFCONSOLE TAKES SEVERAL SECONDS TO START.  TO MAKE SURE WE DO NOT 
+    LAUNCH THE REVERSE PAYLOADS BEFORE THE REVERE HANDLERS ARE READY, THE REMOTE STAGE ONE SCRIPT HAS A FOR LOOP 
+    WHERE IT DUMPS THE NETSTAT OUTPUT CONTAINING THE LISTENING PORT DATA TO A FILE. THIS SCRIPT PULLS THAT FILE 
+    EVERY 5 SECONDS AFTER IT SEES THAT THE HTTP SERVER STARTED AND CHECKS TO SEE IF THE REVERSE LISTENERS HAVE STARTED.
+    ONCE THOSE LISTENERS HAVE STARTED, WE MOVE TO STAGE 2.    
     """
     
+    """
+    WAIT FOR HTTP SERVERS TO START ON MSF_VMs
+    """
     logMsg(configData['LOG_FILE'], "WAITING FOR STAGE ONE SCRIPT(S) TO COMPLETE...")
     modCounter = 0
     for host in configData['MSF_HOSTS']:
@@ -780,6 +786,9 @@ def main():
                         logMsg(configData['LOG_FILE'], str(procEntry))
                         host['SCRIPT_COMPLETE'] = True
                         
+    """
+    HTTP SERVERS HAVE STARTED; CHECK NETSTAT LOGS TO ENSURE ALL REQUIRED PORTS ARE LISTENING
+    """
     for waitCycles in range(60):
         stageTwoComplete = True
         try:
@@ -840,9 +849,14 @@ def main():
             print "CAUGHT KEYBOARD INTERRUPT; ABORTING TEST AND RESETTING VMS...."
             bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
     """
+    STAGE TWO STUFF
+    """
+    
+    """
     MAKE PYTHON AND/OR BASH(ISH) STAGE TWO SCRIPTS TO DOWNLOAD AND START PAYLOADS ON TARGET VMs
     """
     stageTwoWaitNeeded = False
+    stageTwoNeeded = False
     remoteInterpreter =     None
     terminationToken = "!!! STAGE TWO COMPLETE !!!"
     secDelay = 180
@@ -851,7 +865,7 @@ def main():
         logMsg(configData['LOG_FILE'], "PROCESSING " + target['NAME'])
         for sessionData in target['SESSION_DATASETS']:
             if 'PAYLOAD' in sessionData:
-                stageTwoWaitNeeded = True
+                stageTwoNeeded = True
         if target['METHOD'] == 'VM_TOOLS_UPLOAD':
             escapedIp = 'x'.join(target['IP_ADDRESS'].split('.'))
             logMsg(configData['LOG_FILE'], "I THINK " + target['NAME'] + " HAS IP ADDRESS " + target['IP_ADDRESS'])

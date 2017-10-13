@@ -741,9 +741,9 @@ def main():
         remoteStageOneScriptName = msfHost['SCRIPT_PATH'] + '/stageOneScript.sh'
         msfHost['VM_OBJECT'].makeDirOnGuest(msfHost['MSF_ARTIFACT_PATH'])
         msfHost['VM_OBJECT'].makeDirOnGuest(msfHost['SCRIPT_PATH'])
-    """
-    RUN STAGE ONE SCRIPTS
-    """
+        """
+        RUN STAGE ONE SCRIPTS
+        """
         msfHost['VM_OBJECT'].uploadAndRun(msfHost['STAGE_ONE_FILENAME'], remoteStageOneScriptName)
     
     """

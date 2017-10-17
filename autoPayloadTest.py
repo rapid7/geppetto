@@ -572,7 +572,7 @@ def main():
     CAN'T DO THIS EARLIER, AS THE MACHINES WERE OFF....
     """
     for host in configData['TARGETS']:
-        if host['METHOD'] == "VM_TOOLS_UPLOAD":
+        if "VM_TOOLS_UPLOAD" in host['METHOD']:
             host['VM_OBJECT'].makeDirOnGuest(host['PAYLOAD_DIRECTORY'])
             
     """
@@ -866,55 +866,63 @@ def main():
         for sessionData in target['SESSION_DATASETS']:
             if 'PAYLOAD' in sessionData:
                 stageTwoNeeded = True
-        if target['METHOD'] == 'VM_TOOLS_UPLOAD':
-            escapedIp = 'x'.join(target['IP_ADDRESS'].split('.'))
-            logMsg(configData['LOG_FILE'], "I THINK " + target['NAME'] + " HAS IP ADDRESS " + target['IP_ADDRESS'])
-            if 'win' in target['NAME'].lower():
-                target['REMOTE_LOG'] = target['PAYLOAD_DIRECTORY'] + "\\stageTwoLog.txt"
-                target['STAGE_TWO_FILENAME'] = "stageTwoScript_" +  escapedIp + ".py"
-                remoteScriptName =  target['PAYLOAD_DIRECTORY'] + "\\" + target['STAGE_TWO_FILENAME']
+        if stageTwoNeeded:
+            if 'VM_TOOLS_UPLOAD' in target['METHOD'].upper():
+                escapedIp = 'x'.join(target['IP_ADDRESS'].split('.'))
+                logMsg(configData['LOG_FILE'], "I THINK " + target['NAME'] + " HAS IP ADDRESS " + target['IP_ADDRESS'])
+                if 'win' in target['NAME'].lower():
+                    target['REMOTE_LOG'] = target['PAYLOAD_DIRECTORY'] + "\\stageTwoLog.txt"
+                    target['STAGE_TWO_FILENAME'] = "stageTwoScript_" +  escapedIp + ".py"
+                    remoteScriptName =  target['PAYLOAD_DIRECTORY'] + "\\" + target['STAGE_TWO_FILENAME']
+                    localScriptName =   configData['SCRIPT_DIR'] + "/" + target['STAGE_TWO_FILENAME']
+                    remoteInterpreter = target['PYTHON']
+                    target['STAGE_TWO_SCRIPT'] = target['STAGE_TWO_SCRIPT'] + \
+                        apt_shared.makeStageTwoPyScript(target, configData['HTTP_PORT'], target['REMOTE_LOG'], terminationToken)
+                else:
+                    target['REMOTE_LOG'] = target['PAYLOAD_DIRECTORY'] + "/stageTwoLog.txt"
+                    target['STAGE_TWO_FILENAME'] = configData['SCRIPT_DIR'] + '/' + "stageTwoScript_" +  escapedIp + ".sh"
+                    remoteScriptName =  target['PAYLOAD_DIRECTORY'] + "/" + target['STAGE_TWO_FILENAME']
+                    localScriptName =   configData['SCRIPT_DIR'] + "/" + target['STAGE_TWO_FILENAME']
+                    remoteInterpreter = None
+                    target['STAGE_TWO_SCRIPT'] = target['STAGE_TWO_SCRIPT'] + apt_shared.makeStageTwoShScript(target, configData['HTTP_PORT'])
                 localScriptName =   configData['SCRIPT_DIR'] + "/" + target['STAGE_TWO_FILENAME']
-                remoteInterpreter = target['PYTHON']
-                target['STAGE_TWO_SCRIPT'] = target['STAGE_TWO_SCRIPT'] + \
-                    apt_shared.makeStageTwoPyScript(target, configData['HTTP_PORT'], target['REMOTE_LOG'], terminationToken)
-            else:
-                target['REMOTE_LOG'] = target['PAYLOAD_DIRECTORY'] + "/stageTwoLog.txt"
-                target['STAGE_TWO_FILENAME'] = configData['SCRIPT_DIR'] + '/' + "stageTwoScript_" +  escapedIp + ".sh"
-                remoteScriptName =  target['PAYLOAD_DIRECTORY'] + "/" + target['STAGE_TWO_FILENAME']
-                localScriptName =   configData['SCRIPT_DIR'] + "/" + target['STAGE_TWO_FILENAME']
-                remoteInterpreter = None
-                target['STAGE_TWO_SCRIPT'] = target['STAGE_TWO_SCRIPT'] + apt_shared.makeStageTwoShScript(target, configData['HTTP_PORT'])
-            localScriptName =   configData['SCRIPT_DIR'] + "/" + target['STAGE_TWO_FILENAME']
-            try:
-                fileObj = open(localScriptName, 'wb')
-                fileObj.write(target['STAGE_TWO_SCRIPT'])
-                fileObj.close()
-            except IOError as e:
-                logMsg(configData['LOG_FILE'], "[ERROR] FAILED TO WRITE TO FILE " + localScriptName + str(e))
-                bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
-            if 'win' in target['NAME'].lower():
-                addScheduleDelay = True
-                launchResult = target['VM_OBJECT'].uploadAndSchedule(localScriptName, remoteScriptName, secDelay, remoteInterpreter)
-            else:
-                launchResult = target['VM_OBJECT'].uploadAndRun(localScriptName, remoteScriptName, remoteInterpreter)
-            if launchResult:
-                logMsg(configData['LOG_FILE'], "[INFO]: SUCCESSFULLY LAUNCHED " + localScriptName + " ON " + target['VM_OBJECT'].vmName)
-            else:
-                logMsg(configData['LOG_FILE'], "[FATAL ERROR]: FAILED TO UPLOAD/EXECUTE " + localScriptName + " ON " + target['VM_OBJECT'].vmName)
-                bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
+                try:
+                    fileObj = open(localScriptName, 'wb')
+                    fileObj.write(target['STAGE_TWO_SCRIPT'])
+                    fileObj.close()
+                except IOError as e:
+                    logMsg(configData['LOG_FILE'], "[ERROR] FAILED TO WRITE TO FILE " + localScriptName + str(e))
+                    bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
+                logMsg(configData['LOG_FILE'], "METHOD= " + target['METHOD'])
+                if ('win' in target['NAME'].lower()) and ('schedule' in target['METHOD'].lower()):
+                    addScheduleDelay = True
+                    launchResult = target['VM_OBJECT'].uploadAndSchedule(localScriptName, remoteScriptName, secDelay, remoteInterpreter)
+                else:
+                    launchResult = target['VM_OBJECT'].uploadAndRun(localScriptName, remoteScriptName, remoteInterpreter)
+                if launchResult:
+                    logMsg(configData['LOG_FILE'], "[INFO]: SUCCESSFULLY LAUNCHED " + localScriptName + " ON " + target['VM_OBJECT'].vmName)
+                else:
+                    logMsg(configData['LOG_FILE'], "[FATAL ERROR]: FAILED TO UPLOAD/EXECUTE " + localScriptName + " ON " + target['VM_OBJECT'].vmName)
+                    bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
+        else:
+            logMsg(configData['LOG_FILE'], "NO STAGE TWO REQUIRED")
     if addScheduleDelay:
-        logMsg(configData['LOG_FILE'], "[INFO]: SLEEPING FOR " + str(secDelay + 60) + " TO ALLOW SCHEDULED TASKS TO START")
-        time.sleep(secDelay + 20)
+        #IF WE SCHEDULED THE JOBS, ADD THE DELAY IN BEFORE WE BOTHER CHECKING ON THE PROGESS
+        realSleepTime = secDelay + 60
+        logMsg(configData['LOG_FILE'], "[INFO]: SLEEPING FOR " + str(realSleepTime) + " TO ALLOW SCHEDULED TASKS TO START")
+        time.sleep(realSleepTime)
+    else:
+        logMsg(configData['LOG_FILE'], "NO STAGE TWO WAIT REQUIRED")
     
-        #####  ADD OTHER OPTIONS AS THEY BECOME USED..... THINKING MAYBE SCP_UPLOAD?
-
     """
     KEEP PULLING AND CHECKING THE REMOTE STAGE TWO LOG UNTIL WE SEE THE TERMINATION TOKEN
     """
-    if stageTwoWaitNeeded:
+    if not stageTwoNeeded:
+        logMsg(configData['LOG_FILE'], "NO STAGE TWO REQUIRED")
+    else:
         for waitCycles in range(60):
             stageTwoComplete = True
-            if target['METHOD'] == 'VM_TOOLS_UPLOAD':
+            if 'VM_TOOLS_UPLOAD' in target['METHOD']:
                 try:
                     for host in configData['TARGETS']:
                         if 'TERMINATION_TOKEN' not in host:
@@ -944,28 +952,6 @@ def main():
                     print "CAUGHT KEYBOARD INTERRUPT; ABORTING TEST AND RESETTING VMS...."
                     bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
 
-    
-    # HMMMMMMMMM, WELL, WHICH TARGET HAS THE MOST PAYLOADS TO RUN?
-    if stageTwoWaitNeeded:
-        maxPayloads = 0
-        for target in configData['TARGETS']:
-            if 'upload' in target['METHOD'].lower():    #I ONLY CARE ABOUT UPLOADS
-                if maxPayloads < len(target['PAYLOADS']):
-                    maxPayloads = len(target['PAYLOADS'])
-        timeToSleep = 60 + 5 * maxPayloads
-        try:
-            for i in range(timeToSleep):
-                if i % 10 == 0:
-                    logMsg(configData['LOG_FILE'], "WAITING " + str(timeToSleep - i) + " SECONDS FOR STAGE TWO SCRIPT TO FINISH")
-                time.sleep(1)
-            logMsg(configData['LOG_FILE'], "WAKING UP")
-        except KeyboardInterrupt:
-            print "CAUGHT KEYBOARD INTERRUPT; SKIPPING THE WAIT...."
-            pass;
-    else:
-        logMsg(configData['LOG_FILE'], "NO STAGE TWO SCRIPTS UPLOADED..... NOTHING TO SEE HERE; MOVE ALONG")
-        
-    
     """
     MAKE STAGE THREE SCRIPT TO RUN BIND HANDLERS ON MSF HOSTS
     """

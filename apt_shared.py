@@ -2,7 +2,6 @@ from datetime import datetime
 import os
 import time
 import json
-from __builtin__ import False
 
 #
 # GOT TIRED OF TRACKING THIS DATA IN A LIST
@@ -287,10 +286,8 @@ def logMsg(logFile, strMsg):
     if strMsg == None:
         strMsg="[None]"
     dateStamp = 'testlog:[' + str(datetime.now())+ '] '
-    #DELETE THIS LATER:
-    print dateStamp + str(strMsg)
     try:
-        logFileObj = open(logFile, 'ab')
+        logFileObj = open(logFile, 'a')
         logFileObj.write(dateStamp + strMsg +'\n')
         logFileObj.close()
     except IOError:
@@ -304,9 +301,9 @@ def selectVms(vmList, posFilter=None):
         if (posFilter == None) or (posFilter.upper() in i.vmIdentifier.upper()):
             menuVms.append(i)
     for i in range(len(menuVms)):
-            print str(i) + " " + menuVms[i].vmIdentifier  
+            print(str(i) + " " + menuVms[i].vmIdentifier)
     feedBack = raw_input(">> ")
-    print "SELECTION: " + feedBack +'\n'
+    print("SELECTION: " + feedBack +'\n')
     feedbackList = feedBack.split(',')
     for i in feedbackList:
         selectedVmList.append(menuVms[int(i)])

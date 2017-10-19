@@ -558,7 +558,7 @@ def main():
     CAN'T DO THIS EARLIER, AS THE MACHINES WERE OFF....
     """
     for host in configData['TARGETS']:
-        if "VM_TOOLS_UPLOAD" in host['METHOD']:
+        if "VM_TOOLS_UPLOAD" in host['METHOD'].upper():
             host['VM_OBJECT'].makeDirOnGuest(host['PAYLOAD_DIRECTORY'])
             
     """
@@ -738,7 +738,7 @@ def main():
     THERE ARE TWO PARTS TO DETECT THE COMPLETION OF STAGE ONE SCRIPTS:
     THE LAST INSTRUCTION IN THE STAGE ONE SCRIPT IS TO START AN HTTP SERVER TO PROVIDE PAYLOADS, SO WE WAIT UNTIL 
     THE HTTP PROCESS APPEARS.  UNFORUNATELY, MSFCONSOLE TAKES SEVERAL SECONDS TO START.  TO MAKE SURE WE DO NOT 
-    LAUNCH THE REVERSE PAYLOADS BEFORE THE REVERE HANDLERS ARE READY, THE REMOTE STAGE ONE SCRIPT HAS A FOR LOOP 
+    LAUNCH THE REVERSE PAYLOADS BEFORE THE REVERSE HANDLERS ARE READY, THE REMOTE STAGE ONE SCRIPT HAS A FOR LOOP 
     WHERE IT DUMPS THE NETSTAT OUTPUT CONTAINING THE LISTENING PORT DATA TO A FILE. THIS SCRIPT PULLS THAT FILE 
     EVERY 5 SECONDS AFTER IT SEES THAT THE HTTP SERVER STARTED AND CHECKS TO SEE IF THE REVERSE LISTENERS HAVE STARTED.
     ONCE THOSE LISTENERS HAVE STARTED, WE MOVE TO STAGE 2.    
@@ -816,8 +816,6 @@ def main():
         except KeyboardInterrupt:
             print("CAUGHT KEYBOARD INTERRUPT; ABORTING TEST AND RESETTING VMS....")
             bailSafely(configData['TARGETS'], configData['MSF_HOSTS'])
-    
-    logmsg(configData['LOG_FILE'], "WRITING JSON FILE")    
     waitCycles = 3
     for i in range(waitCycles):
         logmsg(configData['LOG_FILE'], "SLEEPING FOR " + str((waitCycles-i)*10) + " SECONDS")
@@ -901,7 +899,7 @@ def main():
     if stageTwoNeeded:
         for waitCycles in range(60):
             stageTwoComplete = True
-            if 'VM_TOOLS_UPLOAD' in target['METHOD']:
+            if 'VM_TOOLS_UPLOAD' in target['METHOD'].upper():
                 try:
                     for host in configData['TARGETS']:
                         if 'TERMINATION_TOKEN' not in host:

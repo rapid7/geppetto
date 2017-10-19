@@ -845,7 +845,7 @@ def main():
         for sessionData in target['SESSION_DATASETS']:
             if 'PAYLOAD' in sessionData:
                 stageTwoNeeded = True
-                if 'bind' in sessionData['PAYLOAD']:
+                if 'bind' in sessionData['PAYLOAD']['NAME']:
                     stageThreeNeeded = True
         if stageTwoNeeded:
             if 'VM_TOOLS_UPLOAD' in target['METHOD'].upper():

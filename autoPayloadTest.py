@@ -889,7 +889,7 @@ def main():
         #IF WE SCHEDULED THE JOBS, ADD THE DELAY IN BEFORE WE BOTHER CHECKING ON THE PROGESS
         realSleepTime = secDelay + 60
         logMSg(configData['LOG_FILE'], "[INFO]: SLEEPING FOR " + str(realSleepTime) + " TO ALLOW SCHEDULED TASKS TO START")
-        time.sleep(realSleepTime)git st
+        time.sleep(realSleepTime)
     else:
         logMSg(configData['LOG_FILE'], "NO STAGE TWO WAIT REQUIRED")
     

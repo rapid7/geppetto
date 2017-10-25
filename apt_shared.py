@@ -145,7 +145,7 @@ def makeRcScript(cmdList, targetData, sessionData, logFile, portNum):
     rubySleep = rubySleep + "echo '</ruby>' >> " + rcScriptName + '\n'
     rcScriptContent = rcScriptContent + "echo 'use " + sessionData['MODULE']['NAME'] + " ' > " + rcScriptName + "\n"
     if sessionData['MODULE']['NAME'] != 'exploit/multi/handler':
-        #THIS IS TERRIBLE, AND I WISH WE DID NOT HAVE TO DO THIS
+        #THIS IS TERRIBLE, AND I WISH WE DID NOT HAVE TO DO THIS MAYBE ONLY FOR AUX LATER?
         rcScriptContent = rcScriptContent + "echo 'set RHOST " + targetData['IP_ADDRESS'] + " ' >> " + rcScriptName + "\n"
         rcScriptContent = rcScriptContent + "echo 'set RHOSTS " + targetData['IP_ADDRESS'] + " ' >> " + rcScriptName + "\n"
     for settingItem in sessionData['MODULE']['SETTINGS']:
@@ -164,6 +164,8 @@ def makeRcScript(cmdList, targetData, sessionData, logFile, portNum):
             rcScriptContent = rcScriptContent + "echo 'set LPORT " + str(sessionData['PAYLOAD']['PRIMARY_PORT']) + "' >> " + rcScriptName + '\n'
         rcScriptContent = rcScriptContent + "echo 'show options' >> " + rcScriptName + '\n'
         rcScriptContent = rcScriptContent + rubySleep
+        if sessionData['MODULE']['NAME'] != 'exploit/multi/handler':
+            rcScriptContent = rcScriptContent + "echo 'check' >> " + rcScriptName + '\n'
         rcScriptContent = rcScriptContent + "echo 'run -z' >> " + rcScriptName + '\n'
         rcScriptContent = rcScriptContent + "echo '<ruby>' >> " + rcScriptName + '\n'
         rcScriptContent = rcScriptContent + "echo '    while framework.sessions.count == 0 do '>> " + rcScriptName + '\n'

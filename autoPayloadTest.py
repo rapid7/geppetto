@@ -29,7 +29,7 @@ def bailSafely(logFile, targets, msfHosts):
     except Exception as e:
         logMsg(logFile, "UNABLE TO RESET TARGET VMS")
         pass
-    exit(False)
+    exit(998)
 
 def breakoutClones(hostDicList, logFile):
     """
@@ -38,17 +38,17 @@ def breakoutClones(hostDicList, logFile):
     for host in hostDicList:
         if "CLONES" in host:
             numClones = len(host['CLONES']) + 1 #Don't forget the original
-            logMSg(logFile, "FOUND " + str(numClones) + " CLONES")
+            logMsg(logFile, "FOUND " + str(numClones) + " CLONES")
             if 'SESSION_DATASETS' in host:
                 numSessions = len(host['SESSION_DATASETS'])
                 sessionsPerClone = numSessions/numClones
-                logMSg(logFile, "USING " + str(sessionsPerClone) + " PAYLOADS PER CLONE")
+                logMsg(logFile, "USING " + str(sessionsPerClone) + " PAYLOADS PER CLONE")
             for clone in host['CLONES']:
                 cloneDic = {}
                 for item in host:
                     if item == 'NAME':
                         cloneDic[item] = clone['NAME']
-                        logMSg(logFile, "ADDED CLONE " + clone['NAME'])
+                        logMsg(logFile, "ADDED CLONE " + clone['NAME'])
                     elif item == 'HYPERVISOR_CONFIG':
                         if 'HYPERVISOR_CONFIG' in clone:
                             cloneDic[item] = clone['HYPERVISOR_CONFIG']
@@ -71,12 +71,12 @@ def createServer(configFile, logFile = "default.log"):
         configStr = fileObj.read()
         fileObj.close()
     except IOError as e:
-        logMSg(logFile, "UNABLE TO OPEN FILE: " + str(configFile) + '\n' + str(e))
+        logMsg(logFile, "UNABLE TO OPEN FILE: " + str(configFile) + '\n' + str(e))
         return None
     try:
         hypervisorDic = json.loads(configStr)
     except Exception as e:
-        logMSg(logFile, "UNABLE TO PARSE FILE: " + str(configFile) + '\n' + str(e))
+        logMsg(logFile, "UNABLE TO PARSE FILE: " + str(configFile) + '\n' + str(e))
         return None
     if "HYPERVISOR_TYPE" not in hypervisorDic:
         print("INVALID CONFIG FILE; NO HYPERVISOR_TYPE FOUND")
@@ -121,38 +121,39 @@ def getCreds(configData, logFile = "default.log"):
         credsStr = credsFile.read()
         credsFile.close()
     except IOError as e:
-        logMSg(logFile, "UNABLE TO OPEN FILE: " + str(configData['CREDS_FILE']) + '\n' + str(e))
+        logMsg(logFile, "UNABLE TO OPEN FILE: " + str(configData['CREDS_FILE']) + '\n' + str(e))
         return False
     try:
         credsDic = json.loads(credsStr)
     except Exception as e:
-        logMSg(logFile, "UNABLE TO PARSE FILE: " + str(configData['CREDS_FILE']) + '\n' + str(e))
+        logMsg(logFile, "UNABLE TO PARSE FILE: " + str(configData['CREDS_FILE']) + '\n' + str(e))
         return False
     
     vmList = configData['MSF_HOSTS'] + configData['TARGETS']
     
     for vm in vmList:
         if 'USERNAME' not in vm:
-            logMSg(logFile, "NO USERNAME FOR " + str(vm['NAME']) + '\n')
+            logMsg(logFile, "NO USERNAME FOR " + str(vm['NAME']) + '\n')
             username = getElement('USERNAME', vm['NAME'],  credsDic)
             if username == False:
                 return False
             else:
-                logMSg(logFile, "FOUND USERNAME FOR " + str(vm['NAME']) + '\n')
+                logMsg(logFile, "FOUND USERNAME FOR " + str(vm['NAME']) + '\n')
                 vm['USERNAME'] = username
         if 'PASSWORD' not in vm:
-            logMSg(logFile, "NO PASSWORD FOR " + str(vm['NAME']) + '\n')
+            logMsg(logFile, "NO PASSWORD FOR " + str(vm['NAME']) + '\n')
             password = getElement('PASSWORD', vm['NAME'],  credsDic)
             if password == False:
                 return False
             else:
-                logMSg(logFile, "FOUND PASSWORD FOR " + str(vm['NAME']) + '\n')
+                logMsg(logFile, "FOUND PASSWORD FOR " + str(vm['NAME']) + '\n')
                 vm['PASSWORD'] = password
     return True
 
 
 def instantiateVmsAndServers(machineList, hypervisorDic, logFile):
     for target in machineList:
+        logMsg(logFile, "PROCESSING: " + target['NAME'])
         if target['TYPE'].upper() == 'VIRTUAL':
             if target['HYPERVISOR_CONFIG'] in hypervisorDic:
                 target['SERVER_OBJECT'] = hypervisorDic[target['HYPERVISOR_CONFIG']]
@@ -165,13 +166,16 @@ def instantiateVmsAndServers(machineList, hypervisorDic, logFile):
             """
             for vm in target['SERVER_OBJECT'].vmList:
                 if vm.vmName == target['NAME']:
-                    logMSg(logFile, "FOUND VM: " + vm.vmName + " ON " + vm.server.hostname)
+                    logMsg(logFile, "FOUND VM: " + vm.vmName + " ON " + vm.server.hostname)
                     target['VM_OBJECT'] = vm
-                    vm.setPassword(target['PASSWORD'])
-                    vm.setUsername(target['USERNAME'])
+                    logMsg(logFile, "ASSIGNED VM: " + str(vm))
+                    if 'PASSWORD' in target:
+                        vm.setPassword(target['PASSWORD'])
+                    if 'USERNAME' in target:
+                        vm.setUsername(target['USERNAME'])
     return None
 
-def logMSg(logFile, strMsg):
+def logMsg(logFile, strMsg):
     if strMsg == None:
         strMsg="[None]"
     dateStamp = 'testlog:[' + str(datetime.now())+ '] '
@@ -295,7 +299,7 @@ def main():
     configData = parseTestConfig(testJsonFile)
     if None == configData:
         logMsg(logFile, "THERE WAS A PROBLEM WITH THE TEST JSON CONFIG FILE")
-        exit(False)
+        exit(999)
 
     """
     SET UP DIRECTORY NAMES IN THE CONFIG DICTIONARY
@@ -385,7 +389,7 @@ def main():
                     #ONLY USE WIN PAYLOADS ON WIN
                     continue
                 else:
-                    logMSg(configData['LOG_FILE'], "ADDING " + str(payload))
+                    logMsg(configData['LOG_FILE'], "ADDING " + str(payload))
                     target['PAYLOADS'].append(payload.copy())
                 # TODO: ADD A CHECK SO WE DO NOT HAVE MULTIPLE SIMILAR MODULES
         if 'MODULES' in configData:
@@ -397,46 +401,46 @@ def main():
     KEYWORDS WITH A UNIQUE PORT VALUE
     """           
     for target in configData['TARGETS']:
-        logMSg(configData['LOG_FILE'], "MODULES = " + str(target['MODULES']))
+        logMsg(configData['LOG_FILE'], "MODULES = " + str(target['MODULES']))
         if 'PAYLOADS' in target:
-            logMSg(configData['LOG_FILE'], "PAYLOADS = " + str(target['PAYLOADS']))
+            logMsg(configData['LOG_FILE'], "PAYLOADS = " + str(target['PAYLOADS']))
             for payload in target['PAYLOADS']:
-                logMSg(configData['LOG_FILE'], str(payload))
+                logMsg(configData['LOG_FILE'], str(payload))
                 #REPLACE THE STRING 'UNIQUE_PORT' WITH AN ACTUAL UNIQUE PORT
                 for settingItem in payload['SETTINGS']:
-                    logMSg(configData['LOG_FILE'], "SETTING ITEM= " + settingItem + str(id(settingItem)))
+                    logMsg(configData['LOG_FILE'], "SETTING ITEM= " + settingItem + str(id(settingItem)))
                     while "UNIQUE_PORT" in settingItem:
                         settingItem = settingItem.replace("UNIQUE_PORT", str(portNum.get()), 1)
-                    logMSg(configData['LOG_FILE'], "SETTING ITEM= " + settingItem + str(id(settingItem)))
+                    logMsg(configData['LOG_FILE'], "SETTING ITEM= " + settingItem + str(id(settingItem)))
         for module in target['MODULES']:
-            logMSg(configData['LOG_FILE'], str(module))
+            logMsg(configData['LOG_FILE'], str(module))
             #REPLACE THE STRING 'UNIQUE_PORT' WITH AN ACTUAL UNIQUE PORT
             for index in range(len(module['SETTINGS'])):
-                logMSg(configData['LOG_FILE'], "SETTING ITEM= " + module['SETTINGS'][index] + str(id(module['SETTINGS'][index])))
+                logMsg(configData['LOG_FILE'], "SETTING ITEM= " + module['SETTINGS'][index] + str(id(module['SETTINGS'][index])))
                 while "UNIQUE_PORT" in module['SETTINGS'][index]:
                     module['SETTINGS'][index] = module['SETTINGS'][index].replace("UNIQUE_PORT", str(portNum.get()), 1)
-                logMSg(configData['LOG_FILE'], "SETTING ITEM= " + module['SETTINGS'][index] + str(id(module['SETTINGS'][index])))
+                logMsg(configData['LOG_FILE'], "SETTING ITEM= " + module['SETTINGS'][index] + str(id(module['SETTINGS'][index])))
 
     #DEBUG PRINT
     for target in configData['TARGETS']:
         if 'PAYLOADS' in target:
-            logMSg(configData['LOG_FILE'], "PAYLOADS = " + str(target['PAYLOADS']))
-        logMSg(configData['LOG_FILE'], "MODULES = " + str(target['MODULES']))
+            logMsg(configData['LOG_FILE'], "PAYLOADS = " + str(target['PAYLOADS']))
+        logMsg(configData['LOG_FILE'], "MODULES = " + str(target['MODULES']))
 
     """
     NOW EACH HOST HAS A LIST OF ALL THE MODULES AND (POSSIBLY) PAYLOADS IT NEEDS TO USE...... 
     ASSEMBLE EXPLOITS AND PAYLOADS OR JUST MODULES THEM TO FORM VOLTRON..... I MEAN, SESSION_DATA
     """
     for target in configData['TARGETS']:
-        logMSg(configData['LOG_FILE'], str(target))
+        logMsg(configData['LOG_FILE'], str(target))
         if 'MODULES' not in target:
-            logMSg(configData['LOG_FILE'], "CONFIG FILE DID NOT HAVE MODULES LISTED FOR " + target['NAME'] + ".  NOTHING TO TEST?")
+            logMsg(configData['LOG_FILE'], "CONFIG FILE DID NOT HAVE MODULES LISTED FOR " + target['NAME'] + ".  NOTHING TO TEST?")
             bailSafely(logFile, configData['TARGETS'], configData['MSF_HOSTS'])
         for module in target['MODULES']:
-            logMSg(configData['LOG_FILE'], str(module))
+            logMsg(configData['LOG_FILE'], str(module))
             if 'exploit' in module['NAME'].lower():
                 for payload in target['PAYLOADS']:
-                    logMSg(configData['LOG_FILE'], str(payload))
+                    logMsg(configData['LOG_FILE'], str(payload))
                     tempDic = {}
                     tempDic['MODULE'] = module.copy()
                     tempDic['PAYLOAD'] = payload.copy()
@@ -450,14 +454,14 @@ def main():
     JUST A DEBUG PRINT HERE TO VERIFY THE STRUCTURES WERE CREATED CORRECTLY
     """
     for target in configData['TARGETS']:
-        logMSg(configData['LOG_FILE'], "================================================================================")
-        logMSg(configData['LOG_FILE'], "SESSION_DATASETS FOR " + target['NAME'])
-        logMSg(configData['LOG_FILE'], "================================================================================")
+        logMsg(configData['LOG_FILE'], "================================================================================")
+        logMsg(configData['LOG_FILE'], "SESSION_DATASETS FOR " + target['NAME'])
+        logMsg(configData['LOG_FILE'], "================================================================================")
         for sessionData in target['SESSION_DATASETS']:
             if 'PAYLOAD' in sessionData:
-                logMSg(configData['LOG_FILE'], sessionData['MODULE']['NAME'] + ":" + sessionData['PAYLOAD']['NAME'])
+                logMsg(configData['LOG_FILE'], sessionData['MODULE']['NAME'] + ":" + sessionData['PAYLOAD']['NAME'])
             else:
-                logMSg(configData['LOG_FILE'], sessionData['MODULE']['NAME'])
+                logMsg(configData['LOG_FILE'], sessionData['MODULE']['NAME'])
             
     """
     PROCESS CLONES
@@ -483,23 +487,23 @@ def main():
         if 'SESSION_DATASETS' in host:
             sessionCount = len(host['SESSION_DATASETS'])
         else:
-            logMSg(configData['LOG_FILE'], "NO TESTING DATA LISTED FOR " + host['NAME'])
+            logMsg(configData['LOG_FILE'], "NO TESTING DATA LISTED FOR " + host['NAME'])
             bailSafely(logFile, configData['TARGETS'], configData['MSF_HOSTS'])
-    logMSg(configData['LOG_FILE'], "MSF_HOST COUNT = " + str(msfHostCount))
-    logMSg(configData['LOG_FILE'], "SESSION COUNT = " + str(sessionCount))
+    logMsg(configData['LOG_FILE'], "MSF_HOST COUNT = " + str(msfHostCount))
+    logMsg(configData['LOG_FILE'], "SESSION COUNT = " + str(sessionCount))
     
     """
     JUST A DEBUG PRINT HERE TO VERIFY THE STRUCTURES WERE CREATED CORRECTLY
     """
     for target in configData['TARGETS']:
-        logMSg(configData['LOG_FILE'], "================================================================================")
-        logMSg(configData['LOG_FILE'], "SESSION_DATASETS FOR " + target['NAME'])
-        logMSg(configData['LOG_FILE'], "================================================================================")
+        logMsg(configData['LOG_FILE'], "================================================================================")
+        logMsg(configData['LOG_FILE'], "SESSION_DATASETS FOR " + target['NAME'])
+        logMsg(configData['LOG_FILE'], "================================================================================")
         for sessionData in target['SESSION_DATASETS']:
             if 'PAYLOAD' in sessionData:
-                logMSg(configData['LOG_FILE'], sessionData['MODULE']['NAME'] + ":" + sessionData['PAYLOAD']['NAME'])
+                logMsg(configData['LOG_FILE'], sessionData['MODULE']['NAME'] + ":" + sessionData['PAYLOAD']['NAME'])
             else:
-                logMSg(configData['LOG_FILE'], sessionData['MODULE']['NAME'])
+                logMsg(configData['LOG_FILE'], sessionData['MODULE']['NAME'])
     
     if not verifyConfig(configData):
         bailSafely(logFile, configData['TARGETS'], configData['MSF_HOSTS'])
@@ -526,7 +530,8 @@ def main():
     for host in configData['TARGETS']:
         if host['TYPE'] == "VIRTUAL":
             if 'TESTING_SNAPSHOT' in host:
-                logMSg(configData['LOG_FILE'], "TRYING TO REVERT TO " + host['TESTING_SNAPSHOT'])
+                logMsg(configData['LOG_FILE'], "TRYING TO REVERT " + host['NAME'] + " TO " + host['TESTING_SNAPSHOT'])
+                logMsg(configData['LOG_FILE'], "TRYING TO REVERT TO " + host['TESTING_SNAPSHOT'])
                 host['VM_OBJECT'].revertToSnapshotByName(host['TESTING_SNAPSHOT'])
             else:
                 host['VM_OBJECT'].takeTempSnapshot()
@@ -540,7 +545,8 @@ def main():
 
 
     """
-    WAIT FOR THE VMS TO BE READY
+    WAIT FOR THE VMS TO BE READY.
+    THIS RELIES ON VMWARE_TOOLS TO BE INSTALLED AND RUNNING.
     """
     for config in hypervisors:
         vmsToCheck = []
@@ -549,12 +555,12 @@ def main():
                 if host['SERVER_OBJECT'] == hypervisors[config]:
                     vmsToCheck.append(host['VM_OBJECT'])
         if not hypervisors[config].waitForVmsToBoot(vmsToCheck):
-            logMSg(configData['LOG_FILE'], "ERROR: ONE OR MORE VMS FAILED TO INITIALIZE; EXITING")
+            logMsg(configData['LOG_FILE'], "ERROR: ONE OR MORE VMS FAILED TO INITIALIZE; EXITING")
             bailSafely(logFile, configData['TARGETS'], configData['MSF_HOSTS'])
         for host in configData['TARGETS'] + configData['MSF_HOSTS']:
             if host['TYPE'] == 'VIRTUAL' and 'IP_ADDRESS' not in host:
                 host['IP_ADDRESS'] = host['VM_OBJECT'].getVmIp()
-                logMSg(configData['LOG_FILE'], host['NAME'] + " IP ADDRESS = " + host['IP_ADDRESS'])
+                logMsg(configData['LOG_FILE'], host['NAME'] + " IP ADDRESS = " + host['IP_ADDRESS'])
 
     """
     CREATE REQUIRED DIRECTORY FOR PAYLOADS ON VM_TOOLS MANAGED MACHINES
@@ -608,13 +614,13 @@ def main():
             stageOneContent = stageOneContent + "git checkout " + configData['FRAMEWORK_BRANCH'] + "\n"
         else:
             # THIS IS A NON_STANDARD REPO....
-            logMSg(configData['LOG_FILE'], "NONSTANDARD FRAMEWORK REPO DETECTED: " + configData['FRAMEWORK_BRANCH'])
+            logMsg(configData['LOG_FILE'], "NONSTANDARD FRAMEWORK REPO DETECTED: " + configData['FRAMEWORK_BRANCH'])
             userName = branchData[0]
-            logMSg(configData['LOG_FILE'], "NONSTANDARD FRAMEWORK USERNAME: " + userName)
+            logMsg(configData['LOG_FILE'], "NONSTANDARD FRAMEWORK USERNAME: " + userName)
             repoName = branchData[1]
-            logMSg(configData['LOG_FILE'], "NONSTANDARD FRAMEWORK REPO NAME: " + repoName)
+            logMsg(configData['LOG_FILE'], "NONSTANDARD FRAMEWORK REPO NAME: " + repoName)
             branchName = branchData[2]
-            logMSg(configData['LOG_FILE'], "NONSTANDARD FRAMEWORK BRANCH NAME: " + branchName)
+            logMsg(configData['LOG_FILE'], "NONSTANDARD FRAMEWORK BRANCH NAME: " + branchName)
             gitSyntax = "https://github.com/" + userName + "/" + repoName + ".git"
             stageOneContent = stageOneContent + "git remote add " + userName + " " + gitSyntax + "\n"
             stageOneContent = stageOneContent + "git fetch  " + userName + "\n"
@@ -645,13 +651,13 @@ def main():
     sessionCounter = 0
     for host in configData['TARGETS']:
         host['LISTEN_PORTS'] = []
-        logMSg(configData['LOG_FILE'], "=============================================================================")
-        logMSg(configData['LOG_FILE'], host['NAME'])
-        logMSg(configData['LOG_FILE'], "=============================================================================")
+        logMsg(configData['LOG_FILE'], "=============================================================================")
+        logMsg(configData['LOG_FILE'], host['NAME'])
+        logMsg(configData['LOG_FILE'], "=============================================================================")
         for sessionData in host['SESSION_DATASETS']:
             sessionData['MSF_HOST'] = configData['MSF_HOSTS'][sessionCounter % len(configData['MSF_HOSTS'])]
             sessionCounter = sessionCounter + 1
-            logMSg(configData['LOG_FILE'], "ASSIGNING TO MSF_HOST " + sessionData['MSF_HOST']['NAME'])
+            logMsg(configData['LOG_FILE'], "ASSIGNING TO MSF_HOST " + sessionData['MSF_HOST']['NAME'])
             stageOneContent = '\n\n##########################\n'
             stageOneContent = stageOneContent + '# MODULE:  ' + sessionData['MODULE']['NAME'] + '\n'
             if 'PAYLOAD' in sessionData:
@@ -725,7 +731,7 @@ def main():
             fileObj.write(msfHost['STAGE_ONE_SCRIPT'])
             fileObj.close()
         except IOError as e:
-            logMSg(configData['LOG_FILE'], "[ERROR] FAILED TO WRITE TO FILE " + msfHost['STAGE_ONE_FILENAME'] + str(e))
+            logMsg(configData['LOG_FILE'], "[ERROR] FAILED TO WRITE TO FILE " + msfHost['STAGE_ONE_FILENAME'] + str(e))
             bailSafely(logFile, configData['TARGETS'], configData['MSF_HOSTS'])
         remoteStageOneScriptName = msfHost['SCRIPT_PATH'] + '/stageOneScript.sh'
         msfHost['VM_OBJECT'].makeDirOnGuest(msfHost['MSF_ARTIFACT_PATH'])
@@ -750,7 +756,7 @@ def main():
     """
     WAIT FOR HTTP SERVERS TO START ON MSF_VMs
     """
-    logMSg(configData['LOG_FILE'], "WAITING FOR STAGE ONE SCRIPT(S) TO COMPLETE...")
+    logMsg(configData['LOG_FILE'], "WAITING FOR STAGE ONE SCRIPT(S) TO COMPLETE...")
     modCounter = 0
     for host in configData['MSF_HOSTS']:
         host['SCRIPT_COMPLETE'] = False
@@ -767,12 +773,12 @@ def main():
             if host['SCRIPT_COMPLETE'] == False:
                 scriptComplete = False
                 if modCounter % 5 == 0:
-                    logMSg(configData['LOG_FILE'], "WAITING FOR PYTHON HTTP SERVER TO START ON " + host['NAME'])
+                    logMsg(configData['LOG_FILE'], "WAITING FOR PYTHON HTTP SERVER TO START ON " + host['NAME'])
                 msfHost['VM_OBJECT'].updateProcList()
                 for procEntry in msfHost['VM_OBJECT'].procList:
                     if ('python' in procEntry.lower()) and (str(configData['HTTP_PORT']) in procEntry):
-                        logMSg(configData['LOG_FILE'], "PYTHON HTTP SERVER FOUND ON " + host['NAME'])
-                        logMSg(configData['LOG_FILE'], str(procEntry))
+                        logMsg(configData['LOG_FILE'], "PYTHON HTTP SERVER FOUND ON " + host['NAME'])
+                        logMsg(configData['LOG_FILE'], str(procEntry))
                         host['SCRIPT_COMPLETE'] = True
                         
     """
@@ -781,17 +787,17 @@ def main():
     for waitCycles in range(60):
         stageTwoComplete = True
         try:
-            logMSg(configData['LOG_FILE'], "CHECKING netstat OUTPUT")
+            logMsg(configData['LOG_FILE'], "CHECKING netstat OUTPUT")
             remoteFile = host['MSF_PAYLOAD_PATH'] + "/netstat.txt"
             for host in configData['MSF_HOSTS']:
                 hostReady = True
                 if 0 == len(host['LISTEN_PORTS']):
-                    logMSg(configData['LOG_FILE'], "NO PORTS REQUIRED FOR " + host['NAME'] + "\n")
+                    logMsg(configData['LOG_FILE'], "NO PORTS REQUIRED FOR " + host['NAME'] + "\n")
                     host['READY'] = True
                 if 'READY' in host and host['READY'] == True:
-                    logMSg(configData['LOG_FILE'], "ALL REQUIRED PORTS READY ON " + host['NAME'] + "\n")
+                    logMsg(configData['LOG_FILE'], "ALL REQUIRED PORTS READY ON " + host['NAME'] + "\n")
                 else:
-                    logMSg(configData['LOG_FILE'], "PORT " + str(host['LISTEN_PORTS']) + " SHOULD BE OPEN ON " + host['NAME'] + "\n")
+                    logMsg(configData['LOG_FILE'], "PORT " + str(host['LISTEN_PORTS']) + " SHOULD BE OPEN ON " + host['NAME'] + "\n")
                     localFile = configData['REPORT_DIR'] + "/" + host['NAME'] + "_netstat_" + str(waitCycles) + ".txt"
                     host['VM_OBJECT'].getFileFromGuest(remoteFile, localFile)
                     try:
@@ -799,16 +805,16 @@ def main():
                         netstatData = netstatFile.read()
                         netstatFile.close()
                     except Exception as e:
-                        logMSg(configData['LOG_FILE'], "FAILED READING NETSTAT FILE: " + localFile + "\n" + str(e))
+                        logMsg(configData['LOG_FILE'], "FAILED READING NETSTAT FILE: " + localFile + "\n" + str(e))
                         #IF WE DID NOT GET A  FILE, WE CANNOT SAY THAT THE PORTS ARE READY
                         netstatData = ""
                         pass
                     for port in host['LISTEN_PORTS']:
                         if str(port) not in netstatData:
                             hostReady = False
-                            logMSg(configData['LOG_FILE'], "PORT " + str(port) + " NOT OPEN ON " + host['NAME'] + "\n")
+                            logMsg(configData['LOG_FILE'], "PORT " + str(port) + " NOT OPEN ON " + host['NAME'] + "\n")
                         else:
-                            logMSg(configData['LOG_FILE'], "PORT " + str(port) + " IS OPEN ON " + host['NAME'] + "\n")
+                            logMsg(configData['LOG_FILE'], "PORT " + str(port) + " IS OPEN ON " + host['NAME'] + "\n")
                     if hostReady == False:
                         stageTwoComplete = False
                     else:
@@ -821,7 +827,7 @@ def main():
             bailSafely(logFile, configData['TARGETS'], configData['MSF_HOSTS'])
     waitCycles = 3
     for i in range(waitCycles):
-        logMSg(configData['LOG_FILE'], "SLEEPING FOR " + str((waitCycles-i)*10) + " SECONDS")
+        logMsg(configData['LOG_FILE'], "SLEEPING FOR " + str((waitCycles-i)*10) + " SECONDS")
         try:
             time.sleep(5)
         except KeyboardInterrupt:
@@ -842,7 +848,7 @@ def main():
     secDelay = 180
     addScheduleDelay = False
     for target in configData['TARGETS']:
-        logMSg(configData['LOG_FILE'], "PROCESSING " + target['NAME'])
+        logMsg(configData['LOG_FILE'], "PROCESSING " + target['NAME'])
         for sessionData in target['SESSION_DATASETS']:
             if 'PAYLOAD' in sessionData:
                 stageTwoNeeded = True
@@ -851,7 +857,7 @@ def main():
         if stageTwoNeeded:
             if 'VM_TOOLS_UPLOAD' in target['METHOD'].upper():
                 escapedIp = 'x'.join(target['IP_ADDRESS'].split('.'))
-                logMSg(configData['LOG_FILE'], "I THINK " + target['NAME'] + " HAS IP ADDRESS " + target['IP_ADDRESS'])
+                logMsg(configData['LOG_FILE'], "I THINK " + target['NAME'] + " HAS IP ADDRESS " + target['IP_ADDRESS'])
                 if 'win' in target['NAME'].lower():
                     target['REMOTE_LOG'] = target['PAYLOAD_DIRECTORY'] + "\\stageTwoLog.txt"
                     target['STAGE_TWO_FILENAME'] = "stageTwoScript_" +  escapedIp + ".py"
@@ -874,28 +880,28 @@ def main():
                     fileObj.write(target['STAGE_TWO_SCRIPT'])
                     fileObj.close()
                 except IOError as e:
-                    logMSg(configData['LOG_FILE'], "[ERROR] FAILED TO WRITE TO FILE " + localScriptName + str(e))
+                    logMsg(configData['LOG_FILE'], "[ERROR] FAILED TO WRITE TO FILE " + localScriptName + str(e))
                     bailSafely(logFile, configData['TARGETS'], configData['MSF_HOSTS'])
-                logMSg(configData['LOG_FILE'], "METHOD= " + target['METHOD'])
+                logMsg(configData['LOG_FILE'], "METHOD= " + target['METHOD'])
                 if ('win' in target['NAME'].lower()) and ('schedule' in target['METHOD'].lower()):
                     addScheduleDelay = True
                     launchResult = target['VM_OBJECT'].uploadAndSchedule(localScriptName, remoteScriptName, secDelay, remoteInterpreter)
                 else:
                     launchResult = target['VM_OBJECT'].uploadAndRun(localScriptName, remoteScriptName, remoteInterpreter)
                 if launchResult:
-                    logMSg(configData['LOG_FILE'], "[INFO]: SUCCESSFULLY LAUNCHED " + localScriptName + " ON " + target['VM_OBJECT'].vmName)
+                    logMsg(configData['LOG_FILE'], "[INFO]: SUCCESSFULLY LAUNCHED " + localScriptName + " ON " + target['VM_OBJECT'].vmName)
                 else:
-                    logMSg(configData['LOG_FILE'], "[FATAL ERROR]: FAILED TO UPLOAD/EXECUTE " + localScriptName + " ON " + target['VM_OBJECT'].vmName)
+                    logMsg(configData['LOG_FILE'], "[FATAL ERROR]: FAILED TO UPLOAD/EXECUTE " + localScriptName + " ON " + target['VM_OBJECT'].vmName)
                     bailSafely(logFile, configData['TARGETS'], configData['MSF_HOSTS'])
         else:
-            logMSg(configData['LOG_FILE'], "NO STAGE TWO REQUIRED FOR " + target['VM_OBJECT'].vmName)
+            logMsg(configData['LOG_FILE'], "NO STAGE TWO REQUIRED FOR " + target['NAME'])
     if addScheduleDelay:
         #IF WE SCHEDULED THE JOBS, ADD THE DELAY IN BEFORE WE BOTHER CHECKING ON THE PROGESS
         realSleepTime = secDelay + 60
-        logMSg(configData['LOG_FILE'], "[INFO]: SLEEPING FOR " + str(realSleepTime) + " TO ALLOW SCHEDULED TASKS TO START")
+        logMsg(configData['LOG_FILE'], "[INFO]: SLEEPING FOR " + str(realSleepTime) + " TO ALLOW SCHEDULED TASKS TO START")
         time.sleep(realSleepTime)
     else:
-        logMSg(configData['LOG_FILE'], "NO STAGE TWO WAIT REQUIRED")
+        logMsg(configData['LOG_FILE'], "NO STAGE TWO WAIT REQUIRED")
     
     """
     KEEP PULLING AND CHECKING THE REMOTE STAGE TWO LOG UNTIL WE SEE THE TERMINATION TOKEN
@@ -913,19 +919,19 @@ def main():
                                 logFileObj = open(localFile, 'r')
                                 logData = logFileObj.read()
                                 logFileObj.close()
-                            except:
-                                logMSg(configData['LOG_FILE'], "FAILED READING REMOTE LOG FILE: " + localFile + "\n" + str(e))
+                            except IOError as e:
+                                logMsg(configData['LOG_FILE'], "FAILED READING REMOTE LOG FILE: " + localFile + "\n" + str(e))
                                 logData = ""
                                 pass
                             if terminationToken not in logData:
-                                logMSg(configData['LOG_FILE'], "NO TERMINATION TOKEN IN LOGFILE ON " + host['NAME'] + "\n")
+                                logMsg(configData['LOG_FILE'], "NO TERMINATION TOKEN IN LOGFILE ON " + host['NAME'] + "\n")
                                 stageTwoComplete = False
                             else:
-                                logMSg(configData['LOG_FILE'], "TERMINATION TOKEN FOUND IN LOGFILE ON " + host['NAME'] + "\n")
+                                logMsg(configData['LOG_FILE'], "TERMINATION TOKEN FOUND IN LOGFILE ON " + host['NAME'] + "\n")
                                 localFile = configData['REPORT_DIR'] + "/" + host['NAME'] + "_netstat_" + str(waitCycles) + ".txt"
                                 host['TERMINATION_TOKEN'] = True
                         else:
-                            logMSg(configData['LOG_FILE'], "ALREADY FOUND TERMINATION TOKEN ON " + host['NAME'] + "\n")
+                            logMsg(configData['LOG_FILE'], "ALREADY FOUND TERMINATION TOKEN ON " + host['NAME'] + "\n")
                     if stageTwoComplete == True:
                         break;    
                     time.sleep(5)
@@ -934,7 +940,7 @@ def main():
                     bailSafely(logFile, configData['TARGETS'], configData['MSF_HOSTS'])
 
     else:
-        logMSg(configData['LOG_FILE'], "NO STAGE TWO REQUIRED")
+        logMsg(configData['LOG_FILE'], "NO STAGE TWO REQUIRED")
     """
     MAKE STAGE THREE SCRIPT TO RUN BIND HANDLERS ON MSF HOSTS
     """
@@ -946,17 +952,17 @@ def main():
                 fileObj.write(msfHost['STAGE_THREE_SCRIPT'])
                 fileObj.close()
             except IOError as e:
-                logMSg(configData['LOG_FILE'], "[ERROR] FAILED TO OPEN FILE " + localScriptName + '\n' + str(e))
+                logMsg(configData['LOG_FILE'], "[ERROR] FAILED TO OPEN FILE " + localScriptName + '\n' + str(e))
                 bailSafely(logFile, configData['TARGETS'], configData['MSF_HOSTS'])
             remoteScriptName = msfHost['SCRIPT_PATH'] + "/stageThree.sh"
             remoteInterpreter = None
             if not msfHost['VM_OBJECT'].uploadAndRun(localScriptName, remoteScriptName, remoteInterpreter):
-                logMSg(configData['LOG_FILE'], "[FATAL ERROR]: FAILED TO UPLOAD/EXECUTE " + localScriptName + " ON " + msfHost['VM_OBJECT'].vmName)
+                logMsg(configData['LOG_FILE'], "[FATAL ERROR]: FAILED TO UPLOAD/EXECUTE " + localScriptName + " ON " + msfHost['VM_OBJECT'].vmName)
                 bailSafely(logFile, configData['TARGETS'], configData['MSF_HOSTS'])
-        logMSg(configData['LOG_FILE'], "WAITING FOR MSFCONSOLES TO LAUNCH...")
+        logMsg(configData['LOG_FILE'], "WAITING FOR MSFCONSOLES TO LAUNCH...")
         time.sleep(20)
     else:
-        logMSg(configData['LOG_FILE'], "NO STAGE THREE SCRIPTS NEEDED")
+        logMsg(configData['LOG_FILE'], "NO STAGE THREE SCRIPTS NEEDED")
         
     """
     WAIT FOR THE METERPRETER SESSIONS TO FINISH....
@@ -978,9 +984,9 @@ def main():
                         msfDone = False
                 time.sleep(1)
                 if modCounter % 10 == 0:
-                    logMSg(configData['LOG_FILE'], str(msfConsoleCount) + " msfconsole PROCESSES STILL RUNNING ON " + msfHost['NAME'])
+                    logMsg(configData['LOG_FILE'], str(msfConsoleCount) + " msfconsole PROCESSES STILL RUNNING ON " + msfHost['NAME'])
             loopCounter = loopCounter + 1
-            logMSg(configData['LOG_FILE'], str(maxLoops-loopCounter) + " LOOPS REMAINING BEFORE AUTOMATIC EXIT")
+            logMsg(configData['LOG_FILE'], str(maxLoops-loopCounter) + " LOOPS REMAINING BEFORE AUTOMATIC EXIT")
             if maxLoops<loopCounter:
                 break
     except KeyboardInterrupt:
@@ -994,7 +1000,7 @@ def main():
             localFileName = configData['REPORT_DIR'] + '/' + msfHost['NAME'] + "_stageThreeLog.txt"
             msfHost['VM_OBJECT'].getFileFromGuest(remoteFileName, localFileName)
     else:
-        logMSg(configData['LOG_FILE'], "NO STAGE THREE LOGFILES")
+        logMsg(configData['LOG_FILE'], "NO STAGE THREE LOGFILES")
         
     """
     PULL REPORT FILES FROM EACH TEST VM
@@ -1003,21 +1009,21 @@ def main():
         for sessionData in target['SESSION_DATASETS']:
             msfPath = sessionData['MSF_HOST']['MSF_PATH']
             remoteFileName = sessionData['RC_OUT_SCRIPT_NAME']
-            logMSg(configData['LOG_FILE'], "RC_OUT_SCRIPT_NAME = " + str(sessionData['RC_OUT_SCRIPT_NAME']))
-            logMSg(configData['LOG_FILE'], "SESSION_DIR = " + configData['SESSION_DIR'])
-            logMSg(configData['LOG_FILE'], "RC_OUT_SCRIPT_NAME = " + str(sessionData['RC_OUT_SCRIPT_NAME'].split('/')[-1]))
+            logMsg(configData['LOG_FILE'], "RC_OUT_SCRIPT_NAME = " + str(sessionData['RC_OUT_SCRIPT_NAME']))
+            logMsg(configData['LOG_FILE'], "SESSION_DIR = " + configData['SESSION_DIR'])
+            logMsg(configData['LOG_FILE'], "RC_OUT_SCRIPT_NAME = " + str(sessionData['RC_OUT_SCRIPT_NAME'].split('/')[-1]))
             localFileName = configData['SESSION_DIR'] + '/' + str(sessionData['RC_OUT_SCRIPT_NAME'].split('/')[-1])
             sessionData['LOCAL_SESSION_FILE'] = localFileName
-            logMSg(configData['LOG_FILE'], "SAVING " + target['NAME'] + ":" + remoteFileName + " AS " + localFileName)
+            logMsg(configData['LOG_FILE'], "SAVING " + target['NAME'] + ":" + remoteFileName + " AS " + localFileName)
             if not sessionData['MSF_HOST']['VM_OBJECT'].getFileFromGuest(remoteFileName, localFileName):
-                logMSg(configData['LOG_FILE'], "FAILED TO SAVE " + target['NAME'] + ":" + remoteFileName + " AS " + localFileName)
+                logMsg(configData['LOG_FILE'], "FAILED TO SAVE " + target['NAME'] + ":" + remoteFileName + " AS " + localFileName)
                 #bailSafely(logFile, configData['TARGETS'], configData['MSF_HOSTS'])
             remoteFileName = sessionData['RC_IN_SCRIPT_NAME']
             localFileName = configData['SESSION_DIR'] + '/' + str(sessionData['RC_IN_SCRIPT_NAME'].split('/')[-1])
             if not sessionData['MSF_HOST']['VM_OBJECT'].getFileFromGuest(remoteFileName, localFileName):
-                logMSg(configData['LOG_FILE'], "FAILED TO SAVE " + target['NAME'] + ":" + remoteFileName + " AS " + localFileName)
+                logMsg(configData['LOG_FILE'], "FAILED TO SAVE " + target['NAME'] + ":" + remoteFileName + " AS " + localFileName)
                 #bailSafely(logFile, configData['TARGETS'], configData['MSF_HOSTS'])
-    logMSg(configData['LOG_FILE'], "FINISHED DOWNLOADING REPORTS")
+    logMsg(configData['LOG_FILE'], "FINISHED DOWNLOADING REPORTS")
     
     """
     GET COMMIT VERSION AND PCAPS
@@ -1036,14 +1042,14 @@ def main():
             commitRaw = fileObj.read().strip()
             fileObj.close()
         except IOError as e:
-            logMSg(logFile, "FAILED TO OPEN " + dstFile)
-            logMSg(logFile, "SYSTEM ERROR: \n" + str(e))
+            logMsg(logFile, "FAILED TO OPEN " + dstFile)
+            logMsg(logFile, "SYSTEM ERROR: \n" + str(e))
         else:
             try:
                 msfHost['COMMIT_VERSION'] = commitRaw.split(' ')[1]
-                logMSg(configData['LOG_FILE'], "COMMIT VERSION OF metasploit-framework on " + msfHost['NAME'] + ": " + msfHost['COMMIT_VERSION'])
+                logMsg(configData['LOG_FILE'], "COMMIT VERSION OF metasploit-framework on " + msfHost['NAME'] + ": " + msfHost['COMMIT_VERSION'])
             except:
-                logMSg(configData['LOG_FILE'], "FAILED TO RETRIEVE COMMIT VERSION")
+                logMsg(configData['LOG_FILE'], "FAILED TO RETRIEVE COMMIT VERSION")
                 msfHost['COMMIT_VERSION'] = "UNKNOWN"
     
     """
@@ -1051,35 +1057,35 @@ def main():
     """
     testResult = True
     for target in configData['TARGETS']:
-        logMSg(configData['LOG_FILE'], "CHECKING " + target['NAME'])
+        logMsg(configData['LOG_FILE'], "CHECKING " + target['NAME'])
         for sessionData in target['SESSION_DATASETS']:
             payloadName = "NONE"
             if 'PAYLOAD' in sessionData:
                 payloadName = sessionData['PAYLOAD']['NAME']
-            logMSg(configData['LOG_FILE'], "CHECKING " + sessionData['MODULE']['NAME'] + ":" + payloadName)
+            logMsg(configData['LOG_FILE'], "CHECKING " + sessionData['MODULE']['NAME'] + ":" + payloadName)
             statusFlag = True
             try:
                 fileObj = open(sessionData['LOCAL_SESSION_FILE'], 'r')
                 fileContents = fileObj.read()
                 fileObj.close()
             except IOError as e:
-                logMSg(configData['LOG_FILE'], "FAILED TO OPEN LOCAL REPORT FILE: " + sessionData['LOCAL_SESSION_FILE'])
+                logMsg(configData['LOG_FILE'], "FAILED TO OPEN LOCAL REPORT FILE: " + sessionData['LOCAL_SESSION_FILE'])
                 continue
             for item in target['SUCCESS_LIST']:
                 if item not in fileContents:
-                    logMSg(configData['LOG_FILE'], str(item))
+                    logMsg(configData['LOG_FILE'], str(item))
                     statusFlag = False
             sessionData['STATUS'] = statusFlag
             if statusFlag:
-                logMSg(configData['LOG_FILE'], sessionData['LOCAL_SESSION_FILE'])
-                logMSg(configData['LOG_FILE'], "TEST PASSED: " + \
+                logMsg(configData['LOG_FILE'], sessionData['LOCAL_SESSION_FILE'])
+                logMsg(configData['LOG_FILE'], "TEST PASSED: " + \
                        target['NAME'] + ':' + \
                        payloadName + ":" + \
                        sessionData['MODULE']['NAME'])
             else:
                 testResult = False
-                logMSg(configData['LOG_FILE'], sessionData['LOCAL_SESSION_FILE'])
-                logMSg(configData['LOG_FILE'], "TEST FAILED: " + \
+                logMsg(configData['LOG_FILE'], sessionData['LOCAL_SESSION_FILE'])
+                logMsg(configData['LOG_FILE'], "TEST FAILED: " + \
                         target['NAME'] + ':' + \
                         payloadName + ":" + \
                        sessionData['MODULE']['NAME'])
@@ -1091,8 +1097,8 @@ def main():
         fileObj.write(htmlReportString)
         fileObj.close()
     except IOError as e:
-        logMSg(logFile, "FAILED TO OPEN " + htmlFileName)
-        logMSg(logFile, "SYSTEM ERROR: \n" + str(e))
+        logMsg(logFile, "FAILED TO OPEN " + htmlFileName)
+        logMsg(logFile, "SYSTEM ERROR: \n" + str(e))
     """
     RETURN ALL TESTING VMS TO TESTING_BASE
     RETURN DEV VM TO WHERE WE FOUND IT
@@ -1104,14 +1110,18 @@ def main():
             msfHost['VM_OBJECT'].powerOff()
     for target in configData['TARGETS']:
         if target['TYPE'] == 'VIRTUAL':
-            logMSg(configData['LOG_FILE'], "REVERTING " + target['NAME'])
+            logMsg(configData['LOG_FILE'], "REVERTING " + target['NAME'])
             target['VM_OBJECT'].revertToTestingBase()
             target['VM_OBJECT'].powerOff()
 
-    logMSg(configData['LOG_FILE'], "WAITING FOR ALL TASKS TO COMPLETE")
+    logMsg(configData['LOG_FILE'], "WAITING FOR ALL TASKS TO COMPLETE")
     time.sleep(5)
-    logMSg(configData['LOG_FILE'], "EXIT")
-    return testResult
+    if testResult:
+        logMsg(configData['LOG_FILE'], "TEST SUCCEEDED")
+        exit(0)
+    else:
+        logMsg(configData['LOG_FILE'], "TEST FAILED")
+        exit(999)
     
 if __name__ == "__main__":
     main()

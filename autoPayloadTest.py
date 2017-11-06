@@ -654,11 +654,15 @@ def main():
         stageOneContent = stageOneContent + "git reset --hard FETCH_HEAD\n"
         stageOneContent = stageOneContent + "git clean -df\n"
         branchData = configData['FRAMEWORK_BRANCH'].split('/')
-        if branchData[0] == 'upstream':
-            #STANDARD BRANCH
+        logMsg(configData['LOG_FILE'], "FRAMEWORK BRANCH LIST: " + str(branchData))
+        logMsg(configData['LOG_FILE'], "FRAMEWORK BRANCH LIST LENGTH: " + str(len((branchData))))
+        
+        if len(branchData) > 0 and ((branchData[0] == 'upstream') or (len(branchData) == 1)):
+            #EITHER A COMMIT VERSION IN MASTER, PR OR upstream/master...... JUST USE WHAT THEY GAVE
+            logMsg(configData['LOG_FILE'], "FRAMEWORK REPO TO USE: " + configData['FRAMEWORK_BRANCH'])
             stageOneContent = stageOneContent + "git checkout " + configData['FRAMEWORK_BRANCH'] + "\n"
         else:
-            # THIS IS A NON_STANDARD REPO....
+            # NONSTANDARD REPO......
             logMsg(configData['LOG_FILE'], "NONSTANDARD FRAMEWORK REPO DETECTED: " + configData['FRAMEWORK_BRANCH'])
             userName = branchData[0]
             logMsg(configData['LOG_FILE'], "NONSTANDARD FRAMEWORK USERNAME: " + userName)

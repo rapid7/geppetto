@@ -405,7 +405,6 @@ def main():
     
     """
     IF GLOBAL PAYLOADS OR MODULES ARE LISTED, FILTER THEM AS BEST WE CAN AND ADD THEM TO EACH TARGET
-    ALSO, REPLACE THE KEYWORD 'UNIQUE_PORT' WITH A UNIQUE PORT IN BOTH THE PAYLOAD AND EXPLOIT SETTINGS
     NB: I THINK USING GLOBAL EXPLOITS IS A TERRIBLE IDEA, BUT I AM AN ENABLER
     """
 
@@ -448,16 +447,10 @@ def main():
                 #REPLACE THE STRING 'UNIQUE_PORT' WITH AN ACTUAL UNIQUE PORT
                 for settingItem in payload['SETTINGS']:
                     logMsg(configData['LOG_FILE'], "SETTING ITEM= " + settingItem + str(id(settingItem)))
-                    while "UNIQUE_PORT" in settingItem:
-                        settingItem = settingItem.replace("UNIQUE_PORT", str(portNum.get()), 1)
                     logMsg(configData['LOG_FILE'], "SETTING ITEM= " + settingItem + str(id(settingItem)))
         for module in target['MODULES']:
             logMsg(configData['LOG_FILE'], str(module))
-            #REPLACE THE STRING 'UNIQUE_PORT' WITH AN ACTUAL UNIQUE PORT
             for index in range(len(module['SETTINGS'])):
-                logMsg(configData['LOG_FILE'], "SETTING ITEM= " + module['SETTINGS'][index] + str(id(module['SETTINGS'][index])))
-                while "UNIQUE_PORT" in module['SETTINGS'][index]:
-                    module['SETTINGS'][index] = module['SETTINGS'][index].replace("UNIQUE_PORT", str(portNum.get()), 1)
                 logMsg(configData['LOG_FILE'], "SETTING ITEM= " + module['SETTINGS'][index] + str(id(module['SETTINGS'][index])))
 
     #DEBUG PRINT
@@ -1020,7 +1013,7 @@ def main():
     msfDone = False
     loopCounter = 0
     msfConsoleCount = 1
-    maxLoops = sessionCounter * 5 + 100
+    maxLoops = sessionCounter * 5 + 200
     try:
         while not msfDone:
             msfDone = True

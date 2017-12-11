@@ -339,6 +339,8 @@ def main():
     """
     SET UP DIRECTORY NAMES IN THE CONFIG DICTIONARY
     """
+    if 'FRAMEWORK_BRANCH' not in configData:
+        configData['FRAMEWORK_BRANCH'] = 'upstream/master'
     configData['REPORT_PREFIX'] = os.path.splitext(os.path.basename(args.testfile))[0]
     if args.payload != None:
         payloadType = args.payload.split('/')[-1]

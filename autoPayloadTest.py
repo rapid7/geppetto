@@ -1,4 +1,5 @@
 import apt_shared
+import argparse
 from datetime import datetime
 import hashlib
 import json
@@ -108,7 +109,7 @@ def getTimestamp():
 
 def getElement(element, vmName, credsDic):
     for credVmName in credsDic.keys():
-        if vmName in credVmName:
+        if vmName.strip() == credVmName:
             if element in credsDic[credVmName]:
                 return credsDic[credVmName][element]
     return False
@@ -164,8 +165,10 @@ def instantiateVmsAndServers(machineList, hypervisorDic, logFile):
             """
             INSTANTIATE VM INSTANCE AND STORE IT IN THE DICTIONARY
             """
+            vmFound = False
             for vm in target['SERVER_OBJECT'].vmList:
                 if vm.vmName == target['NAME']:
+                    vmFound = True
                     logMsg(logFile, "FOUND VM: " + vm.vmName + " ON " + vm.server.hostname)
                     target['VM_OBJECT'] = vm
                     logMsg(logFile, "ASSIGNED VM: " + str(vm))
@@ -173,7 +176,10 @@ def instantiateVmsAndServers(machineList, hypervisorDic, logFile):
                         vm.setPassword(target['PASSWORD'])
                     if 'USERNAME' in target:
                         vm.setUsername(target['USERNAME'])
-    return None
+            if not vmFound:
+                logMsg(logFile, "DID NOT FIND VM: " + target['NAME'] + " ON " + vm.server.hostname)
+                return False
+    return True
 
 def logMsg(logFile, strMsg):
     if strMsg == None:
@@ -291,20 +297,54 @@ def parseHypervisorConfig(hypervisorConfigFile):
 
 def main():
     logFile = None
-    usageStatement = "autoPayloadTest [options] <test.json>"
-    if len(sys.argv) < 2:
-        logMsg(logFile, "INCORRECT PARAMETER LIST:\n " + usageStatement)
-        bailSafely(logFile, configData['TARGETS'], configData['MSF_HOSTS'])
-    testJsonFile =              sys.argv[1]
-    configData = parseTestConfig(testJsonFile)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-v", "--verbose", help="Echo test result to console", action="store_true")
+    parser.add_argument("-f", "--framework", help="Framework branch to use (Overrides testfile)")
+    parser.add_argument("-m", "--module", help="Module to use")
+    parser.add_argument("-p", "--payload", help="Meterpreter payload to use")
+    parser.add_argument("-po", "--payloadoptions", help="Comma delineated venom-style settings for the given payload: attribute=x,attribute2=y...")
+    parser.add_argument("testfile", help="json test file to use")
+    args = parser.parse_args()
+
+    configData = parseTestConfig(args.testfile)
     if None == configData:
         logMsg(logFile, "THERE WAS A PROBLEM WITH THE TEST JSON CONFIG FILE")
         exit(999)
 
+    if args.framework != None:
+        configData['FRAMEWORK_BRANCH'] = args.framework
+
+    if args.payload != None:
+        payloadDic = {}
+        payloadDic['NAME'] = args.payload
+        if args.payloadoptions != None:
+            payloadDic['SETTINGS'] = args.payloadoptions.split(',')
+        else:
+            payloadDic['SETTINGS'] = []
+        if 'PAYLOADS' in configData:
+            configData['PAYLOADS'].append(payloadDic.copy())
+        else:
+            configData['PAYLOADS'] = [payloadDic.copy()]
+        if (args.module == None) and ('MODULES' not in configData):
+            args.module = "exploit/multi/handler"
+
+    if args.module != None:
+        moduleDic = {}
+        moduleDic['NAME'] = args.module
+        moduleDic['SETTINGS'] = []
+        if 'MODULES' in configData:
+            configData['MODULES'].append(moduleDic.copy())
+        else:
+            configData['MODULES'] = [moduleDic.copy()]
     """
     SET UP DIRECTORY NAMES IN THE CONFIG DICTIONARY
     """
-    configData['REPORT_PREFIX'] = os.path.splitext(os.path.basename(testJsonFile))[0]
+    if 'FRAMEWORK_BRANCH' not in configData:
+        configData['FRAMEWORK_BRANCH'] = 'upstream/master'
+    configData['REPORT_PREFIX'] = os.path.splitext(os.path.basename(args.testfile))[0]
+    if args.payload != None:
+        payloadType = args.payload.split('/')[-1]
+        configData['REPORT_PREFIX'] = configData['REPORT_PREFIX'] + "-" + payloadType
     configData['TIMESTAMP'] =   str(time.time()).split('.')[0]
     configData['DATA_DIR']  =   os.getcwd() + "/" + "test_data"
     configData['TEST_DIR'] =    configData['DATA_DIR'] + "/" + configData['REPORT_PREFIX'] + "_" + configData['TIMESTAMP']
@@ -330,12 +370,12 @@ def main():
     logFile = configData['LOG_FILE']
     
     
+    if 'TARGET_GLOBALS' in configData:
+        expandGlobalAttributes(configData)
+
     if 'CREDS_FILE' in configData:
         if getCreds(configData) == False:
             bailSafely(logFile, configData['TARGETS'], configData['MSF_HOSTS'])
-    
-    if 'TARGET_GLOBALS' in configData:
-        expandGlobalAttributes(configData)
 
     """
     I WANTED TO AVOID PORT COLLISIONS< SO I MADE A CLASS THAT TRACKS THE PORTS AND 
@@ -367,9 +407,9 @@ def main():
     
     """
     IF GLOBAL PAYLOADS OR MODULES ARE LISTED, FILTER THEM AS BEST WE CAN AND ADD THEM TO EACH TARGET
-    ALSO, REPLACE THE KEYWORD 'UNIQUE_PORT' WITH A UNIQUE PORT IN BOTH THE PAYLOAD AND EXPLOIT SETTINGS
     NB: I THINK USING GLOBAL EXPLOITS IS A TERRIBLE IDEA, BUT I AM AN ENABLER
     """
+
     for target in configData['TARGETS']:
         if 'PAYLOADS' not in target:
             target['PAYLOADS'] = []
@@ -409,16 +449,10 @@ def main():
                 #REPLACE THE STRING 'UNIQUE_PORT' WITH AN ACTUAL UNIQUE PORT
                 for settingItem in payload['SETTINGS']:
                     logMsg(configData['LOG_FILE'], "SETTING ITEM= " + settingItem + str(id(settingItem)))
-                    while "UNIQUE_PORT" in settingItem:
-                        settingItem = settingItem.replace("UNIQUE_PORT", str(portNum.get()), 1)
                     logMsg(configData['LOG_FILE'], "SETTING ITEM= " + settingItem + str(id(settingItem)))
         for module in target['MODULES']:
             logMsg(configData['LOG_FILE'], str(module))
-            #REPLACE THE STRING 'UNIQUE_PORT' WITH AN ACTUAL UNIQUE PORT
             for index in range(len(module['SETTINGS'])):
-                logMsg(configData['LOG_FILE'], "SETTING ITEM= " + module['SETTINGS'][index] + str(id(module['SETTINGS'][index])))
-                while "UNIQUE_PORT" in module['SETTINGS'][index]:
-                    module['SETTINGS'][index] = module['SETTINGS'][index].replace("UNIQUE_PORT", str(portNum.get()), 1)
                 logMsg(configData['LOG_FILE'], "SETTING ITEM= " + module['SETTINGS'][index] + str(id(module['SETTINGS'][index])))
 
     #DEBUG PRINT
@@ -511,8 +545,9 @@ def main():
     INSTANTIATE REQUIRED SERVER INSTANCES AND ADD THEM TO THE DICTIONARY
     """
     hypervisors = {}
-    instantiateVmsAndServers(configData['MSF_HOSTS']+configData['TARGETS'], hypervisors, configData['LOG_FILE'])
-
+    if not instantiateVmsAndServers(configData['MSF_HOSTS']+configData['TARGETS'], hypervisors, configData['LOG_FILE']):
+        logMsg(configData['LOG_FILE'], "[ERROR] THERE WAS A PROBLEM PREPARING THE VMS.  PLEASE CHECK TO MAKE SURE THE VMS ARE PRESENT.")
+        bailSafely(logFile, configData['TARGETS'], configData['MSF_HOSTS'])
     """
     PREP ALL MSF_HOSTS AND TARGETS
     FOR MSF_HOSTS:
@@ -534,7 +569,12 @@ def main():
                 logMsg(configData['LOG_FILE'], "TRYING TO REVERT TO " + host['TESTING_SNAPSHOT'])
                 host['VM_OBJECT'].revertToSnapshotByName(host['TESTING_SNAPSHOT'])
             else:
-                host['VM_OBJECT'].takeTempSnapshot()
+                logMsg(configData['LOG_FILE'], "TRYING TO TAKE TEMP SNAPSHOT ON " + host['NAME'])
+                tempSnapshot = host['VM_OBJECT'].takeTempSnapshot()
+                if tempSnapshot != None:
+                    host['TESTING_SNAPSHOT'] = tempSnapshot
+                else:
+                    logMsg(configData['LOG_FILE'], "FAILED TO TAKE SNAPSHOT ON " + host['NAME'] + " TO " + host['TESTING_SNAPSHOT'])
     for host in configData['MSF_HOSTS']:
         host['VM_OBJECT'].takeTempSnapshot()
     for host in configData['TARGETS'] + configData['MSF_HOSTS']:
@@ -609,11 +649,15 @@ def main():
         stageOneContent = stageOneContent + "git reset --hard FETCH_HEAD\n"
         stageOneContent = stageOneContent + "git clean -df\n"
         branchData = configData['FRAMEWORK_BRANCH'].split('/')
-        if branchData[0] == 'upstream':
-            #STANDARD BRANCH
+        logMsg(configData['LOG_FILE'], "FRAMEWORK BRANCH LIST: " + str(branchData))
+        logMsg(configData['LOG_FILE'], "FRAMEWORK BRANCH LIST LENGTH: " + str(len((branchData))))
+        
+        if len(branchData) > 0 and ((branchData[0] == 'upstream') or (len(branchData) == 1)):
+            #EITHER A COMMIT VERSION IN MASTER, PR OR upstream/master...... JUST USE WHAT THEY GAVE
+            logMsg(configData['LOG_FILE'], "FRAMEWORK REPO TO USE: " + configData['FRAMEWORK_BRANCH'])
             stageOneContent = stageOneContent + "git checkout " + configData['FRAMEWORK_BRANCH'] + "\n"
         else:
-            # THIS IS A NON_STANDARD REPO....
+            # NONSTANDARD REPO......
             logMsg(configData['LOG_FILE'], "NONSTANDARD FRAMEWORK REPO DETECTED: " + configData['FRAMEWORK_BRANCH'])
             userName = branchData[0]
             logMsg(configData['LOG_FILE'], "NONSTANDARD FRAMEWORK USERNAME: " + userName)
@@ -892,7 +936,7 @@ def main():
                     logMsg(configData['LOG_FILE'], "[INFO]: SUCCESSFULLY LAUNCHED " + localScriptName + " ON " + target['VM_OBJECT'].vmName)
                 else:
                     logMsg(configData['LOG_FILE'], "[FATAL ERROR]: FAILED TO UPLOAD/EXECUTE " + localScriptName + " ON " + target['VM_OBJECT'].vmName)
-                    bailSafely(logFile, configData['TARGETS'], configData['MSF_HOSTS'])
+                    #bailSafely(logFile, configData['TARGETS'], configData['MSF_HOSTS'])
         else:
             logMsg(configData['LOG_FILE'], "NO STAGE TWO REQUIRED FOR " + target['NAME'])
     if addScheduleDelay:
@@ -971,7 +1015,7 @@ def main():
     msfDone = False
     loopCounter = 0
     msfConsoleCount = 1
-    maxLoops = sessionCounter * 5 + 500
+    maxLoops = sessionCounter * 5 + 200
     try:
         while not msfDone:
             msfDone = True
@@ -1118,9 +1162,13 @@ def main():
     time.sleep(5)
     if testResult:
         logMsg(configData['LOG_FILE'], "TEST SUCCEEDED")
+        if args.verbose:
+            print("PASSED")
         exit(0)
     else:
         logMsg(configData['LOG_FILE'], "TEST FAILED")
+        if args.verbose:
+            print("FAILED")
         exit(999)
     
 if __name__ == "__main__":

@@ -11,5 +11,5 @@ config/
 test_data/
 
 #ignore log file
-tools/snapshot.log
-tools/power.log
+helpers/snapshot.log
+helpers/power.log

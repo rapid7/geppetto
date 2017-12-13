@@ -1,0 +1,4 @@
+java/meterpreter/bind_tcp
+java/meterpreter/reverse_http
+java/meterpreter/reverse_https
+java/meterpreter/reverse_tcp

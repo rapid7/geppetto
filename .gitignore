@@ -10,3 +10,6 @@ config/
 # ignore output files
 test_data/
 
+#ignore log file
+tools/snapshot.log
+tools/power.log

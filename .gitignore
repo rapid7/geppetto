@@ -10,3 +10,5 @@ config/
 # ignore output files
 test_data/
 
+#ignore log file
+helpers/*.log

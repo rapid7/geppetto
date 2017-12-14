@@ -1,0 +1,13 @@
+windows/meterpreter/bind_tcp
+windows/meterpreter/bind_tcp_uuid
+windows/meterpreter/reverse_http
+windows/meterpreter/reverse_https
+windows/meterpreter/reverse_tcp
+windows/meterpreter/reverse_tcp_dns
+windows/meterpreter/reverse_tcp_uuid
+windows/meterpreter/reverse_winhttp
+windows/meterpreter/reverse_winhttps
+windows/meterpreter_bind_tcp
+windows/meterpreter_reverse_http
+windows/meterpreter_reverse_https
+windows/meterpreter_reverse_tcp

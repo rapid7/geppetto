@@ -652,7 +652,7 @@ def main():
         logMsg(configData['LOG_FILE'], "FRAMEWORK BRANCH LIST: " + str(branchData))
         logMsg(configData['LOG_FILE'], "FRAMEWORK BRANCH LIST LENGTH: " + str(len((branchData))))
         
-        if len(branchData) > 0 and ((branchData[0] == 'upstream') or (len(branchData) == 1)):
+        if len(branchData) > 0 and ((branchData[0] == 'upstream' or branchData[0] == 'origin') or (len(branchData) == 1)):
             #EITHER A COMMIT VERSION IN MASTER, PR OR upstream/master...... JUST USE WHAT THEY GAVE
             logMsg(configData['LOG_FILE'], "FRAMEWORK REPO TO USE: " + configData['FRAMEWORK_BRANCH'])
             stageOneContent = stageOneContent + "git checkout " + configData['FRAMEWORK_BRANCH'] + "\n"

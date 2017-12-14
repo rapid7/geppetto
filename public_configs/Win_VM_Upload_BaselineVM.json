@@ -14,16 +14,13 @@
 			"CLONES":
 			[
 				{
-					"NAME":			"APT_MSF_HOST_CLONE1",
-					"HYPERVISOR_CONFIG":	"../JSON/esxi_config.json",
+					"NAME":			"APT_MSF_HOST_CLONE1"
 				},
 				{
-					"NAME":			"APT_MSF_HOST_CLONE2",
-					"HYPERVISOR_CONFIG":	"../JSON/esxi_config.json",
+					"NAME":			"APT_MSF_HOST_CLONE2"
 				},
 				{
-					"NAME":			"APT_MSF_HOST_CLONE3",
-					"HYPERVISOR_CONFIG":	"../JSON/esxi_config.json",
+					"NAME":			"APT_MSF_HOST_CLONE3"
 				}
 			]
 		}

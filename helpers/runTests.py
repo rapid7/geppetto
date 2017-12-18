@@ -48,13 +48,16 @@ def main():
         cmdString = cmdString + moduleOption
         cmdString = cmdString + verboseOption
         cmdList.append(cmdString)
-        
+    failures = 0
     for cmd in cmdList:
         print cmd
         if subprocess.call(cmd.split()) == 0:
             print("PASSED")
         else:
+            failures += 1
             print("FAILED")
+    if failures > 0:
+        exit(1)
     
 if __name__ == "__main__":
     main()

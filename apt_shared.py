@@ -753,6 +753,7 @@ def makeStageTwoShScript(targetData, httpPort, remoteLogFile, terminationToken):
                 stageTwoShContent = stageTwoShContent + targetData['METERPRETER_JAVA'] + " -jar " + payloadFile + "&\n"
             else:
                 stageTwoShContent = stageTwoShContent + "./" + payloadFile + "&\n"
+            stageTwoShContent = stageTwoShContent + "echo " + terminationToken + " > " + remoteLogFile + "\n"
     return stageTwoShContent
 
 def parseHypervisorConfig(hypervisorConfigFile):

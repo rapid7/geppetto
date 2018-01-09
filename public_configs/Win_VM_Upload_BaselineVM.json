@@ -118,16 +118,6 @@
 			[]
 		},
 		{
-			"NAME": 		"Win2008r2x64",
-			"CLONES":
-			[]
-		},
-		{
-			"NAME": 		"Win2008r2x64sp1",
-			"CLONES":
-			[]
-		},
-		{
 			"NAME": 		"Win2012x64",
 			"CLONES":
 			[]

@@ -23,6 +23,181 @@ class portValue:
         self.portNumber = self.portNumber + 1
         return self.portNumber
 
+def resetVms(testConfig):
+    if testConfig != None and 'LOG_FILE' in testConfig:
+        return False
+    retVal = True
+    for hostKey in ['MSF_HOSTS', 'TARGETS']:
+        if hostKey in testConfig:
+            for host in  (testConfig[hostKey]):
+                if host['TYPE'] == "VIRTUAL":
+                    logMsg(testConfig['LOG_FILE'], "RESETTING VM " + self.vmName)
+                    if 'TESTING_SNAPSHOT' in host:
+                        host['VM_OBJECT'].revertToSnapshotByName(host['TESTING_SNAPSHOT'])
+                        host['VM_OBJECT'].powerOff()
+                    elif 'TEMP_SNAPSHOT' in host:
+                        host['VM_OBJECT'].revertToSnapshotByName(host['TEMP_SNAPSHOT'])
+                        host['VM_OBJECT'].deleteSnapshot(host['TEMP_SNAPSHOT'])
+                        host['VM_OBJECT'].powerOff()
+                    else:
+                        logMsg(testConfig['LOG_FILE'], "NO TEST OR TEMP SNAPSHOT FOUND FOR " + self.vmName)
+                        retVal = False
+    return retVal
+
+def bailSafely(testConfig):
+    if testConfig != None and 'LOG_FILE' in testConfig:
+        logFile = testConfig['LOG_FILE']
+        logMsg(logFile, "AN ERROR HAPPENED; RETURNING VMS TO THEIR FULL UPRIGHT AND LOCKED POSITIONS")
+        timeToWait = 10
+        for i in range(timeToWait):
+            logMsg(logFile, "SLEEPING FOR " + str(timeToWait-i) + " SECOND(S); EXIT NOW TO PRESERVE VMS!")
+            time.sleep(1)
+        if resetVms(testConfig):
+            logMsg(logFile, "SUCCESSFULLY RESET VMS")
+        else:
+            logMsg(logFile, "THERE WAS A PROBLEM RESETTING VMS")
+    exit(998)
+
+def logTargetData(testConfig):
+    """
+    DEBUG PRINT
+    """
+    for target in testConfig['TARGETS']:
+        logMsg(testConfig['LOG_FILE'], "================================================================================")
+        logMsg(testConfig['LOG_FILE'], "SESSION_DATASETS FOR " + target['NAME'])
+        logMsg(testConfig['LOG_FILE'], "================================================================================")
+        for sessionData in target['SESSION_DATASETS']:
+            if 'PAYLOAD' in sessionData:
+                logMsg(testConfig['LOG_FILE'], sessionData['MODULE']['NAME'] + ":" + sessionData['PAYLOAD']['NAME'])
+            else:
+                logMsg(testConfig['LOG_FILE'], sessionData['MODULE']['NAME'])
+    return None
+
+def runTest(testConfig, portNum):
+    """
+    FIGURE OUT HOW MANY PAYLOADS WE HAVE AND HOW MANY MSF_HOSTS WE HAVE
+    SO WE CAN SPLIT THE WORK AMONG ALL MSF_HOSTS
+    """
+    msfHostCount = len(testConfig['MSF_HOSTS'])
+    sessionCount = getSessionCount(testConfig)
+    logMsg(testConfig['LOG_FILE'], "MSF_HOST COUNT = " + str(msfHostCount))
+    logMsg(testConfig['LOG_FILE'], "SESSION COUNT = " + str(sessionCount))
+
+    testVms = instantiateVmsAndServers(testConfig)
+    # IF WE COULD NOT FIND A VM, ABORT
+    if None in testVms:
+        return False
+
+    #TAKE SNAPSHOT AND/OR SET THE VMS TO THE DESIRED SNAPSHOT AND POWERS ON
+    prepTestVms(testConfig)
+    
+    # WAIT UNTIL ALL VMS HAVE A WORKING TOOLS SERVICE AND AN IP ADDRESS
+    if not waitForVms(testVms):
+        return False
+        
+    """
+    MAKE SURE THE TEST CONFIG HAS ANY DHCP ADDRESSES SET PROPERLY AND VERIFY ALL TARGETS?MSF_HOSTS HAVE AN IP
+    """
+    if not setVmIPs(testConfig):
+        return False
+
+    msfHostCount = len(testConfig['MSF_HOSTS'])
+    sessionCount = getSessionCount(testConfig)
+
+    """
+    CREATE REQUIRED DIRECTORY FOR PAYLOADS ON VM_TOOLS MANAGED MACHINES
+    CAN'T DO THIS EARLIER, AS THE MACHINES WERE OFF AND WE NEEDED DHCP-GENERATED IP ADDRESSES
+    """
+    for host in testConfig['TARGETS']:
+        if "VM_TOOLS_UPLOAD" in host['METHOD'].upper():
+            host['VM_OBJECT'].makeDirOnGuest(host['PAYLOAD_DIRECTORY'])
+    sessionCounter = prepStagedScripts(testConfig, portNum)
+    finishAndLaunchStageOne(testConfig['MSF_HOSTS'], testConfig['HTTP_PORT'])
+    if not waitForHttpServer(testConfig['MSF_HOSTS'], testConfig['LOG_FILE'], testConfig['HTTP_PORT']):
+        return False
+    if not waitForMsfPayloads(testConfig['MSF_HOSTS'], testConfig['REPORT_DIR'], testConfig['LOG_FILE']):
+        return False
+
+    """
+    STAGE TWO STUFF
+    """
+    terminationToken = "!!! STAGE TWO COMPLETE !!!"
+    stageTwoResults = launchStageTwo(testConfig, terminationToken, 180)
+    if not stageTwoResults[0]:
+        return False
+    else:
+        stageTwoNeeded = stageTwoResults[1]
+        stageThreeNeeded = stageTwoResults[1]
+    
+    """
+    IF WE LAUNCHED STAGE TWO, WAIT FOR THE SCRIPTS TO COMPLETE
+    """
+    if stageTwoNeeded:
+        if not finishStageTwo(testConfig, terminationToken):
+            return False
+    else:
+        logMsg(testConfig['LOG_FILE'], "NO STAGE TWO REQUIRED")
+
+
+    """
+    MAKE STAGE THREE SCRIPT TO RUN BIND HANDLERS ON MSF HOSTS
+    """
+    if stageThreeNeeded:
+        if not launchStageThree(testConfig):
+            return False
+        else:
+            logMsg(configData['LOG_FILE'], "WAITING FOR MSFCONSOLES TO LAUNCH...")
+            time.sleep(20)
+    else:
+        logMsg(configData['LOG_FILE'], "NO STAGE THREE SCRIPTS NEEDED")
+        
+    """
+    WAIT FOR THE METERPRETER SESSIONS TO FINISH....
+    """
+    waitForMeterpreters(configData, sessionCounter)
+
+    """
+    PULL STAGE THREE LOG FILES FROM MSF VMS
+    """
+    if stageThreeNeeded:
+        for msfHost in configData['MSF_HOSTS']:
+            remoteFileName = msfHost['STAGE_THREE_LOGFILE']
+            localFileName = configData['REPORT_DIR'] + '/' + msfHost['NAME'] + "_stageThreeLog.txt"
+            msfHost['VM_OBJECT'].getFileFromGuest(remoteFileName, localFileName)
+    else:
+        logMsg(configData['LOG_FILE'], "NO STAGE THREE LOGFILES")
+        
+    """
+    PULL REPORT FILES FROM EACH TEST VM
+    """
+    pullTargetLogs(configData)
+    logMsg(configData['LOG_FILE'], "FINISHED DOWNLOADING REPORTS")
+    
+    """
+    GET COMMIT VERSION, PCAPS, AND OTHER LOGS FROM MSF HOSTS
+    """
+    pullMsfLogs(configData)
+    
+    """
+    CHECK TEST RESULTS
+    """
+    testResult = checkData(configData)
+    
+    """
+    GENERATE HTML REPORT
+    """
+    htmlReportString = makeHtmlReport(configData['TARGETS'], configData['MSF_HOSTS'])
+    htmlFileName = configData['REPORT_DIR'] + "/" + configData['REPORT_PREFIX'] + ".html"
+    try:
+        fileObj = open(htmlFileName, 'w')
+        fileObj.write(htmlReportString)
+        fileObj.close()
+    except IOError as e:
+        logMsg(logFile, "FAILED TO OPEN " + htmlFileName)
+        logMsg(logFile, "SYSTEM ERROR: \n" + str(e))
+    return testResult
+
+
 def checkData(testConfig):
     testResult = True
     for target in testConfig['TARGETS']:
@@ -432,7 +607,26 @@ def prepStagedScripts(testConfig, portNum):
     """
     THE FIRST FEW LINES OF THE STAGE ONE SCRIPT PREP THINGS
     """
-
+    """
+    CREATE STAGE SCRIPTS
+        STAGE_ONE_SCRIPT: 
+            RUNS ON MSF_HOSTS AND CONTAIN THE MSFVENOM COMMANDS TO 
+            CREATE THE PAYLOADS THAT NEED TO BE UPLOADED TO THE TARGETS,
+            START AN HTTP SERVER ON THE MSF_HOSTS TO SERVE THE PAYLOADS,
+            AND LAUNCH THE SPECIFIED EXPLOITS
+        STAGE_TWO_SCRIPTS:
+            RUN ON TARGET SYSTEMS AND CONTAIN THE COMMANDS TO DOWNLOAD 
+            THE PAYLOADS FROM THE MSF_HOSTS AND LAUNCH THEM ON THE TARGETS
+        STAGE_THREE_SCRIPT:
+            RUN ON THE MSF_HOSTS TO ESTABLISH CONNECTIONS TO THE BIND PAYLOADS
+    """
+    lineComment = '\n#################################################################\n'
+    for host in testConfig['MSF_HOSTS']:
+        host['STAGE_ONE_SCRIPT'] = lineComment + "\n # STAGE ONE SCRIPT FOR " + host['NAME'] + lineComment
+        host['STAGE_THREE_SCRIPT'] = lineComment + "\n # STAGE THREE SCRIPT FOR " + host['NAME'] + lineComment
+    for host in testConfig['TARGETS']:
+        host['STAGE_TWO_SCRIPT'] = lineComment + "\n # STAGE TWO SCRIPT FOR " + host['NAME'] + lineComment   
+    
     fileId=0;
     for host in testConfig['MSF_HOSTS']:
         host['LISTEN_PORTS'] = []
@@ -571,9 +765,9 @@ def prepTestVms(testConfig):
                 host['VM_OBJECT'].revertToSnapshotByName(host['TESTING_SNAPSHOT'])
             else:
                 logMsg(testConfig['LOG_FILE'], "TRYING TO TAKE TEMP SNAPSHOT ON " + host['NAME'])
-                tempSnapshot = host['VM_OBJECT'].takeTempSnapshot()
+                tempSnapshot = host['VM_OBJECT'].takeSnapshot('PAYLOAD_TESTING_'+testConfig['TIMESTAMP'])
                 if tempSnapshot != None:
-                    host['TESTING_SNAPSHOT'] = tempSnapshot
+                    host['TEMP_SNAPSHOT'] = tempSnapshot
                 else:
                     logMsg(testConfig['LOG_FILE'], "FAILED TO TAKE SNAPSHOT ON " + host['NAME'] + " TO " + host['TESTING_SNAPSHOT'])
     for host in testConfig['MSF_HOSTS']:
@@ -766,29 +960,6 @@ def revertVm(vmObject, snapshot = None):
                 self.deleteSnapshot(i[0].name)
         vmObject.powerOff()
         return True
-
-def bailSafely(testConfig):
-    if testConfig != None and 'LOG_FILE' in testConfig:
-        logFile = testConfig['LOG_FILE']
-        logMsg(logFile, "AN ERROR HAPPENED; RETURNING VMS TO THEIR FULL UPRIGHT AND LOCKED POSITIONS")
-        timeToWait = 10
-        for i in range(timeToWait):
-            logMsg(logFile, "SLEEPING FOR " + str(timeToWait-i) + " SECOND(S); EXIT NOW TO PRESERVE VMS!")
-            time.sleep(1)
-        try:
-            for host in  (testConfig['MSF_HOSTS'] + testConfig['TARGETS']):
-                if host['TYPE'] == "VIRTUAL":
-                    if 'TESTING_SNAPSHOT' in host:
-                        snapshot = host['TESTING_SNAPSHOT']
-                    else:
-                        snapshot = None
-                    revertVm(host['VM_OBJECT'], snapshot)
-        except Exception as e:
-            logMsg(logFile, "SLEEPING FOR " + str(timeToWait-i) + " SECOND(S); EXIT NOW TO PRESERVE VMS!")
-            pass
-    else:
-        print("UNABLE TO RESET VMS")
-    exit(998)
 
 def breakoutClones(hostDicList, logFile):
     """

@@ -26,38 +26,10 @@ def main():
     NB: I THINK USING GLOBAL EXPLOITS IS A TERRIBLE IDEA, BUT I AM AN ENABLER
     """
     apt_shared.expandPayloadsAndModules(configData)
-
-    """
-    CREATE STAGE SCRIPTS
-        STAGE_ONE_SCRIPT: 
-            RUNS ON MSF_HOSTS AND CONTAIN THE MSFVENOM COMMANDS TO 
-            CREATE THE PAYLOADS THAT NEED TO BE UPLOADED TO THE TARGETS,
-            START AN HTTP SERVER ON THE MSF_HOSTS TO SERVE THE PAYLOADS,
-            AND LAUNCH THE SPECIFIED EXPLOITS
-        STAGE_TWO_SCRIPTS:
-            RUN ON TARGET SYSTEMS AND CONTAIN THE COMMANDS TO DOWNLOAD 
-            THE PAYLOADS FROM THE MSF_HOSTS AND LAUNCH THEM ON THE TARGETS
-        STAGE_THREE_SCRIPT:
-            RUN ON THE MSF_HOSTS TO ESTABLISH CONNECTIONS TO THE BIND PAYLOADS
-    """
-    lineComment = '\n#################################################################\n'
-    for host in configData['MSF_HOSTS']:
-        host['STAGE_ONE_SCRIPT'] = lineComment + "\n # STAGE ONE SCRIPT FOR " + host['NAME'] + lineComment
-        host['STAGE_THREE_SCRIPT'] = lineComment + "\n # STAGE THREE SCRIPT FOR " + host['NAME'] + lineComment
-    for host in configData['TARGETS']:
-        host['STAGE_TWO_SCRIPT'] = lineComment + "\n # STAGE TWO SCRIPT FOR " + host['NAME'] + lineComment   
-    
      
-    """
-    NOW THAT THE MODULES AND PAYLOADS HAVE BEEN BROKEN OUT, REPLACE THE UNIQUE_PORT
-    KEYWORDS WITH A UNIQUE PORT VALUE
-    I WANTED TO AVOID PORT COLLISIONS, SO I MADE A CLASS THAT TRACKS THE PORTS AND 
-    EACH TIME YOU RUN get() ON IT, IT RETURNS A PORT VALUE AND INCREMENTS IT SO
-    AS LONG AS YOU GET PORTS FROM THIS STRUCT, THEY WILL NEVER COLLIDE.
-    IT IS AS CLOSE AS I SEEM TO BE ABLE TO GET IN PYTHON TO A SINGLETON
-    """
+    #portValue TRACKS PORTS SO WE DO NOT REUSE A PORT AND CAUSE A PROBLEM
     portNum = apt_shared.portValue(configData['STARTING_LISTENER'])
-    
+    #REPLACE 'UNIQUE_PORT' WILDCARD WITH AN ACTUAL UNIQUE PORT
     apt_shared.replacePortKeywords(configData, portNum)
     
     #DEBUG PRINT
@@ -69,22 +41,12 @@ def main():
     """
     NOW EACH HOST HAS A LIST OF ALL THE MODULES AND (POSSIBLY) PAYLOADS IT NEEDS TO USE...... 
     ASSEMBLE EXPLOITS AND PAYLOADS OR JUST MODULES THEM TO FORM VOLTRON..... I MEAN, SESSION_DATA
-    TP HELP TRACK THE ACTUAL SESSION ESTABLISHED (IF ANY)
+    TO HELP TRACK THE ACTUAL SESSIONS ESTABLISHED (IF ANY)
     """
     apt_shared.setupSessionData(configData)
     
-    """
-    JUST A DEBUG PRINT HERE TO VERIFY THE STRUCTURES WERE CREATED CORRECTLY
-    """
-    for target in configData['TARGETS']:
-        apt_shared.logMsg(configData['LOG_FILE'], "================================================================================")
-        apt_shared.logMsg(configData['LOG_FILE'], "SESSION_DATASETS FOR " + target['NAME'])
-        apt_shared.logMsg(configData['LOG_FILE'], "================================================================================")
-        for sessionData in target['SESSION_DATASETS']:
-            if 'PAYLOAD' in sessionData:
-                apt_shared.logMsg(configData['LOG_FILE'], sessionData['MODULE']['NAME'] + ":" + sessionData['PAYLOAD']['NAME'])
-            else:
-                apt_shared.logMsg(configData['LOG_FILE'], sessionData['MODULE']['NAME'])
+    #DEBUG PRINT
+    apt_shared.logTargetData(configData)
             
     """
     PROCESS CLONES
@@ -102,18 +64,8 @@ def main():
     apt_shared.expandGlobalList(configData['TARGETS'], configData['SUCCESS_LIST'], "SUCCESS_LIST")
             
     
-    """
-    JUST A DEBUG PRINT HERE TO VERIFY THE STRUCTURES WERE CREATED CORRECTLY
-    """
-    for target in configData['TARGETS']:
-        apt_shared.logMsg(configData['LOG_FILE'], "================================================================================")
-        apt_shared.logMsg(configData['LOG_FILE'], "SESSION_DATASETS FOR " + target['NAME'])
-        apt_shared.logMsg(configData['LOG_FILE'], "================================================================================")
-        for sessionData in target['SESSION_DATASETS']:
-            if 'PAYLOAD' in sessionData:
-                apt_shared.logMsg(configData['LOG_FILE'], sessionData['MODULE']['NAME'] + ":" + sessionData['PAYLOAD']['NAME'])
-            else:
-                apt_shared.logMsg(configData['LOG_FILE'], sessionData['MODULE']['NAME'])
+    #DEBUG PRINT
+    apt_shared.logTargetData(configData)
     
     """
     NOW THAT THE COMPLETE TEST CONFIG HAS BEEN CREATED, VERIFY IT
@@ -126,151 +78,19 @@ def main():
     SPLIT CONFIG INTO SMALLER CONFIGS HERE, THEN PARSE OUT THE REST.
     """
     
-    """
-    FIGURE OUT HOW MANY PAYLOADS WE HAVE AND HOW MANY MSF_HOSTS WE HAVE
-    SO WE CAN SPLIT THE WORK AMONG ALL MSF_HOSTS
-    """
-    msfHostCount = len(configData['MSF_HOSTS'])
-    sessionCount = apt_shared.getSessionCount(configData)
-    apt_shared.logMsg(configData['LOG_FILE'], "MSF_HOST COUNT = " + str(msfHostCount))
-    apt_shared.logMsg(configData['LOG_FILE'], "SESSION COUNT = " + str(sessionCount))
-
-    testVms = apt_shared.instantiateVmsAndServers(configData)
-    # IF WE COULD NOT FIND A VM, ABORT
-    if None in testVms:
-        apt_shared.bailSafely(configData)
-
-    #TAKE SNAPSHOT AND/OR SET THE VMS TO THE DESIRED SNAPSHOT AND POWERS ON
-    apt_shared.prepTestVms(configData)
-    
-    # WAIT UNTIL ALL VMS HAVE A WORKING TOOLS SERVICE AND AN IP ADDRESS
-    if False == apt_shared.waitForVms(testVms):
-        apt_shared.bailSafely(testVms)
-        
-    # MAKE SURE THE TEST CONFIG HAS ANY DHCP ADDRESSES SET PROPERLY AND VERIFY ALL TARGETS?MSF_HOSTS HAVE AN IP
-    if not apt_shared.setVmIPs(configData):
-        apt_shared.bailSafely(testVms)
-
-    msfHostCount = len(configData['MSF_HOSTS'])
-    sessionCount = apt_shared.getSessionCount(configData)
-    
-    """
-    CREATE REQUIRED DIRECTORY FOR PAYLOADS ON VM_TOOLS MANAGED MACHINES
-    CAN'T DO THIS EARLIER, AS THE MACHINES WERE OFF AND WER NEEDED DHCP-Generated IP ADDRESSES
-    """
-    for host in configData['TARGETS']:
-        if "VM_TOOLS_UPLOAD" in host['METHOD'].upper():
-            host['VM_OBJECT'].makeDirOnGuest(host['PAYLOAD_DIRECTORY'])
-            
-    sessionCounter = apt_shared.prepStagedScripts(configData, portNum)
-    
-    apt_shared.finishAndLaunchStageOne(configData['MSF_HOSTS'], configData['HTTP_PORT'])
-    
-    if not apt_shared.waitForHttpServer(configData['MSF_HOSTS'], configData['LOG_FILE'], configData['HTTP_PORT']):
-        apt_shared.bailSafely(testVms)
-    
-    if not apt_shared.waitForMsfPayloads(configData['MSF_HOSTS'], configData['REPORT_DIR'], configData['LOG_FILE']):
-        apt_shared.bailSafely(testVms)      
-
+    testResult = apt_shared.runTest(configData, portNum)
 
     """
-    STAGE TWO STUFF
+    RETURN VMS TO SNAPSHOTS
     """
-    
-    terminationToken = "!!! STAGE TWO COMPLETE !!!"
-    stageTwoResults = apt_shared.launchStageTwo(configData, terminationToken, 180)
-    if not stageTwoResults[0]:
-        apt_shared.bailSafely(testVms)
+    if resetVms(testConfig):
+        apt_shared.logMsg(logFile, "SUCCESSFULLY RESET VMS")
     else:
-        stageTwoNeeded = stageTwoResults[1]
-        stageThreeNeeded = stageTwoResults[1]
+        apt_shared.logMsg(logFile, "THERE WAS A PROBLEM RESETTING VMS")
     
     """
-    IF WE LAUNCHED STAGE TWO, WAIT FOR THE SCRIPTS TO COMPLETE
+    WAIT A COUPLE SECONDS TO MAKE SURE WVERYTHING COMPLETES, THEN RETURN THE PROPER VALUE
     """
-    if stageTwoNeeded:
-        if not apt_shared.finishStageTwo(configData, terminationToken):
-            apt_shared(bailSafely)
-    else:
-        apt_shared.logMsg(configData['LOG_FILE'], "NO STAGE TWO REQUIRED")
-
-
-    """
-    MAKE STAGE THREE SCRIPT TO RUN BIND HANDLERS ON MSF HOSTS
-    """
-    if stageThreeNeeded:
-        if not apt_shared.launchStageThree(configData):
-            apt_shared.bailSafely(testVms)
-        else:
-            apt_shared.logMsg(configData['LOG_FILE'], "WAITING FOR MSFCONSOLES TO LAUNCH...")
-            time.sleep(20)
-    else:
-        apt_shared.logMsg(configData['LOG_FILE'], "NO STAGE THREE SCRIPTS NEEDED")
-        
-    """
-    WAIT FOR THE METERPRETER SESSIONS TO FINISH....
-    """
-    apt_shared.waitForMeterpreters(configData, sessionCounter)
-
-    """
-    PULL STAGE THREE LOG FILES FROM MSF VMS
-    """
-    if stageThreeNeeded:
-        for msfHost in configData['MSF_HOSTS']:
-            remoteFileName = msfHost['STAGE_THREE_LOGFILE']
-            localFileName = configData['REPORT_DIR'] + '/' + msfHost['NAME'] + "_stageThreeLog.txt"
-            msfHost['VM_OBJECT'].getFileFromGuest(remoteFileName, localFileName)
-    else:
-        apt_shared.logMsg(configData['LOG_FILE'], "NO STAGE THREE LOGFILES")
-        
-    """
-    PULL REPORT FILES FROM EACH TEST VM
-    """
-    apt_shared.pullTargetLogs(configData)
-
-    apt_shared.logMsg(configData['LOG_FILE'], "FINISHED DOWNLOADING REPORTS")
-    
-    """
-    GET COMMIT VERSION AND PCAPS
-    """
-    apt_shared.pullMsfLogs(configData)
-    
-    """
-    CHECK TEST RESULTS
-    """
-    
-    testResult = apt_shared.checkData(configData)
-    
-    """
-    GENERATE HTML REPORT
-    """
-
-    htmlReportString = apt_shared.makeHtmlReport(configData['TARGETS'], configData['MSF_HOSTS'])
-    htmlFileName = configData['REPORT_DIR'] + "/" + configData['REPORT_PREFIX'] + ".html"
-    try:
-        fileObj = open(htmlFileName, 'w')
-        fileObj.write(htmlReportString)
-        fileObj.close()
-    except IOError as e:
-        apt_shared.logMsg(logFile, "FAILED TO OPEN " + htmlFileName)
-        apt_shared.logMsg(logFile, "SYSTEM ERROR: \n" + str(e))
-
-    """
-    RETURN ALL TESTING VMS TO TESTING_BASE
-    RETURN DEV VM TO WHERE WE FOUND IT
-    POWER OFF ALL VMS
-    """
-
-    for msfHost in configData['MSF_HOSTS']:
-        if msfHost['TYPE'] == 'VIRTUAL':
-            msfHost['VM_OBJECT'].revertMsfVm()
-            msfHost['VM_OBJECT'].powerOff()
-    for target in configData['TARGETS']:
-        if target['TYPE'] == 'VIRTUAL':
-            apt_shared.logMsg(configData['LOG_FILE'], "REVERTING " + target['NAME'])
-            target['VM_OBJECT'].revertToTestingBase()
-            target['VM_OBJECT'].powerOff()
-
     apt_shared.logMsg(configData['LOG_FILE'], "WAITING FOR ALL TASKS TO COMPLETE")
     time.sleep(5)
     if testResult:
@@ -282,7 +102,7 @@ def main():
         apt_shared.logMsg(configData['LOG_FILE'], "TEST FAILED")
         if args.verbose:
             print("FAILED")
-        exit(999)
+        exit(998)
     
 if __name__ == "__main__":
     main()

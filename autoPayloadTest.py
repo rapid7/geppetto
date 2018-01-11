@@ -43,8 +43,9 @@ def main():
     ASSEMBLE EXPLOITS AND PAYLOADS OR JUST MODULES THEM TO FORM VOLTRON..... I MEAN, SESSION_DATA
     TO HELP TRACK THE ACTUAL SESSIONS ESTABLISHED (IF ANY)
     """
-    apt_shared.setupSessionData(configData)
-    
+    if not apt_shared.setupSessionData(configData):
+        apt_shared.bailSafely(configData)
+
     #DEBUG PRINT
     apt_shared.logTargetData(configData)
             
@@ -83,10 +84,10 @@ def main():
     """
     RETURN VMS TO SNAPSHOTS
     """
-    if resetVms(testConfig):
-        apt_shared.logMsg(logFile, "SUCCESSFULLY RESET VMS")
+    if apt_shared.resetVms(configData):
+        apt_shared.logMsg(configData['LOG_FILE'], "SUCCESSFULLY RESET VMS")
     else:
-        apt_shared.logMsg(logFile, "THERE WAS A PROBLEM RESETTING VMS")
+        apt_shared.logMsg(configData['LOG_FILE'], "THERE WAS A PROBLEM RESETTING VMS")
     
     """
     WAIT A COUPLE SECONDS TO MAKE SURE WVERYTHING COMPLETES, THEN RETURN THE PROPER VALUE

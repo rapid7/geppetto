@@ -167,7 +167,10 @@ def expandPayloadsAndModules(testConfig):
                     continue
                 else:
                     logMsg(testConfig['LOG_FILE'], "ADDING " + str(payload))
-                    target['PAYLOADS'].append(payload.copy())
+                    tempPayload = {}
+                    tempPayload['NAME'] = payload['NAME']
+                    tempPayload['SETTINGS'] = payload['SETTINGS'][:]
+                    target['PAYLOADS'].append(tempPayload)
                 # TODO: ADD A CHECK SO WE DO NOT HAVE MULTIPLE SIMILAR MODULES
         if 'MODULES' in testConfig:
             for module in testConfig['MODULES']:
@@ -565,7 +568,7 @@ def makeHtmlReport(targetData, msfHosts):
     htmlString = htmlString + "</table>\n</body>\n</html>\n"
     return htmlString
 
-def makeVenomCmd(targetData, sessionData, portTracker, logFile):
+def makeVenomCmd(targetData, sessionData, portNum, logFile):
     payloadData = sessionData['PAYLOAD']
     payloadType = payloadData['NAME']
     payloadFileName = payloadData['FILENAME']
@@ -595,6 +598,7 @@ def makeVenomCmd(targetData, sessionData, portTracker, logFile):
     else:
         msfVenomCmd = msfVenomCmd + " LHOST=" + msfHostData['IP_ADDRESS'] + " LPORT=" + str(payloadData['PRIMARY_PORT'])
     for settingEntry in payloadData['SETTINGS']:
+        processedString = replaceWildcards(settingEntry, targetData, sessionData, portNum)
         msfVenomCmd = msfVenomCmd + " " + settingEntry
     logMsg(logFile, "msfvenom cmd = " + msfVenomCmd)
     return msfVenomCmd
@@ -968,9 +972,9 @@ def prepStagedScripts(testConfig, portNum):
                                                         '-' + 'x'.join(host['IP_ADDRESS'].split('.')) + \
                                                         '-' + uniqueId
                 sessionData['PAYLOAD']['VENOM_CMD'] =  makeVenomCmd(host, 
-                                                                               sessionData, 
-                                                                               portNum, 
-                                                                               testConfig['LOG_FILE'])
+                                                                    sessionData, 
+                                                                    portNum, 
+                                                                    testConfig['LOG_FILE'])
                 #ADD VENOM COMMAND TO THE SCRIPT CONTENT
                 stageOneContent = stageOneContent + sessionData['PAYLOAD']['VENOM_CMD'] + '\n'
                 stageOneContent = stageOneContent + 'mv ' + sessionData['PAYLOAD']['FILENAME'] + \
@@ -1085,9 +1089,15 @@ def replacePortKeywords(testConfig, portNum):
             for payload in target['PAYLOADS']:
                 logMsg(testConfig['LOG_FILE'], str(payload))
                 #REPLACE THE STRING 'UNIQUE_PORT' WITH AN ACTUAL UNIQUE PORT
-                for settingItem in payload['SETTINGS']:
-                    logMsg(testConfig['LOG_FILE'], "SETTING ITEM= " + settingItem + str(id(settingItem)))
-                    logMsg(testConfig['LOG_FILE'], "SETTING ITEM= " + settingItem + str(id(settingItem)))
+#                for settingItem in payload['SETTINGS']:
+#                    logMsg(testConfig['LOG_FILE'], "SETTING ITEM= " + settingItem + str(id(settingItem)))
+#                    logMsg(testConfig['LOG_FILE'], "SETTING ITEM= " + settingItem + str(id(settingItem)))
+                for index in range(len(payload['SETTINGS'])):
+                    logMsg(testConfig['LOG_FILE'], "SETTING ITEM= " + payload['SETTINGS'][index] + str(id(payload['SETTINGS'][index])))
+                    if 'UNIQUE_PORT' in payload['SETTINGS'][index]:
+                        originalString = payload['SETTINGS'][index]
+                        payload['SETTINGS'][index] = originalString.replace("UNIQUE_PORT", str(portNum.get()), 1)
+                    logMsg(testConfig['LOG_FILE'], "SETTING ITEM= " + payload['SETTINGS'][index] + str(id(payload['SETTINGS'][index])))
         for module in target['MODULES']:
             logMsg(testConfig['LOG_FILE'], str(module))
             for index in range(len(module['SETTINGS'])):
@@ -1433,7 +1443,7 @@ def waitForHttpServer(msfHosts, logFile, httpPort):
                         host['SCRIPT_COMPLETE'] = True
     return True
 
-def waitForMeterpreters(testConfig, sessionCounter, timeoutSec = 300):
+def waitForMeterpreters(testConfig, sessionCounter, timeoutSec = 500):
     modCounter = 0
     msfDone = False
     loopCounter = 0
@@ -1461,7 +1471,7 @@ def waitForMeterpreters(testConfig, sessionCounter, timeoutSec = 300):
                 if currentCount < previousCount:
                     finishedSpawning = True
                 if currentCount == previousCount:
-                    logMsg(testConfig['LOG_FILE'], "NO CHANGE IN METERPRETER PROCESS COUNT")
+                    logMsg(testConfig['LOG_FILE'], "NO CHANGE IN METERPRETER PROCESS COUNT [" + str(staticCount) +"]")
                     staticCount = staticCount + 1
                 else:
                     staticCount = 0

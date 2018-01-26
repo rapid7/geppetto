@@ -1,15 +1,9 @@
 import apt_shared
 import argparse
-from datetime import datetime
-import hashlib
-import json
-import os
-import sys
 import time
-import vm_automation
+
 
 def main():
-    logFile = None
     parser = argparse.ArgumentParser()
     parser.add_argument("-v", "--verbose", help="Echo test result to console", action="store_true")
     parser.add_argument("-f", "--framework", help="Framework branch to use (Overrides testfile)")
@@ -27,12 +21,12 @@ def main():
     """
     apt_shared.expandPayloadsAndModules(configData)
      
-    #portValue TRACKS PORTS SO WE DO NOT REUSE A PORT AND CAUSE A PROBLEM
+    # portValue TRACKS PORTS SO WE DO NOT REUSE A PORT AND CAUSE A PROBLEM
     portNum = apt_shared.portValue(configData['STARTING_LISTENER'])
-    #REPLACE 'UNIQUE_PORT' WILDCARD WITH AN ACTUAL UNIQUE PORT
+    # REPLACE 'UNIQUE_PORT' WILDCARD WITH AN ACTUAL UNIQUE PORT
     apt_shared.replacePortKeywords(configData, portNum)
     
-    #DEBUG PRINT
+    # DEBUG PRINT
     for target in configData['TARGETS']:
         if 'PAYLOADS' in target:
             apt_shared.logMsg(configData['LOG_FILE'], "PAYLOADS = " + str(target['PAYLOADS']))
@@ -46,7 +40,7 @@ def main():
     if not apt_shared.setupSessionData(configData):
         apt_shared.bailSafely(configData)
 
-    #DEBUG PRINT
+    # DEBUG PRINT
     apt_shared.logTargetData(configData)
             
     """
@@ -65,7 +59,7 @@ def main():
     apt_shared.expandGlobalList(configData['TARGETS'], configData['SUCCESS_LIST'], "SUCCESS_LIST")
             
     
-    #DEBUG PRINT
+    # DEBUG PRINT
     apt_shared.logTargetData(configData)
     
     """
@@ -107,4 +101,3 @@ def main():
     
 if __name__ == "__main__":
     main()
-    

@@ -23,6 +23,7 @@ class portValue:
         self.portNumber = self.portNumber + 1
         return self.portNumber
 
+
 def bailSafely(testConfig):
     if testConfig != None and 'LOG_FILE' in testConfig:
         logFile = testConfig['LOG_FILE']
@@ -36,6 +37,7 @@ def bailSafely(testConfig):
         else:
             logMsg(logFile, "THERE WAS A PROBLEM RESETTING VMS")
     exit(998)
+
 
 def breakoutClones(hostDicList, logFile):
     """
@@ -71,6 +73,7 @@ def breakoutClones(hostDicList, logFile):
                         cloneDic[item] = host[item]
                 hostDicList.append(cloneDic)
 
+
 def checkData(testConfig):
     testResult = True
     for target in testConfig['TARGETS']:
@@ -105,8 +108,9 @@ def checkData(testConfig):
                 logMsg(testConfig['LOG_FILE'], "TEST FAILED: " + \
                         target['NAME'] + ':' + \
                         payloadName + ":" + \
-                       sessionData['MODULE']['NAME'])
+                        sessionData['MODULE']['NAME'])
     return testResult
+
 
 def createServer(configFile, logFile = "default.log"):
     try:
@@ -129,6 +133,7 @@ def createServer(configFile, logFile = "default.log"):
     if hypervisorDic['HYPERVISOR_TYPE'].lower() == "workstation":
         return vm_automation.workstationServer(hypervisorDic, logFile)
 
+
 def expandGlobalAttributes(configData, logFile = "default.log"):
     if 'LOG_FILE' in configData:
         logFile = configData['LOG_FILE']
@@ -138,13 +143,15 @@ def expandGlobalAttributes(configData, logFile = "default.log"):
             for target in configData['TARGETS']:
                 if key not in target:
                     target[key] = configData['TARGET_GLOBALS'][key]
-                    
+
+
 def expandGlobalList(hostList, globalList, listName):
     for target in hostList:
         if listName not in target:
             target[listName] = []
         for listItem in globalList:
             target[listName].append(listItem)
+
 
 def expandPayloadsAndModules(testConfig):
     for target in testConfig['TARGETS']:
@@ -176,6 +183,7 @@ def expandPayloadsAndModules(testConfig):
             for module in testConfig['MODULES']:
                 target['MODULES'].append(module.copy())
 
+
 def findAndConfigVms(vmList, vmDataList):
     foundVmList = []
     for vmData in vmDataList:
@@ -194,6 +202,7 @@ def findAndConfigVms(vmList, vmDataList):
                 j.setPassword(vmPassword)
                 j.setUsername(vmUsername)
     return foundVmList
+
 
 def finishAndLaunchStageOne(msfHosts, httpPort, logFile):
     # MAKE THE REST OF THE STAGE ONE SCRIPT
@@ -227,6 +236,7 @@ def finishAndLaunchStageOne(msfHosts, httpPort, logFile):
         msfHost['VM_OBJECT'].uploadAndRun(msfHost['STAGE_ONE_FILENAME'], remoteStageOneScriptName)
     return True
 
+
 def checkStagesNeeded(targetData):
     stageTwoNeeded = False
     stageThreeNeeded = False
@@ -236,6 +246,7 @@ def checkStagesNeeded(targetData):
             if 'bind' in sessionData['PAYLOAD']['NAME']:
                 stageThreeNeeded = True
     return (stageTwoNeeded, stageThreeNeeded)
+
 
 def finishStageTwo(testConfig, terminationToken, timeoutSec = 300):
     for waitCycles in range(timeoutSec/5):
@@ -276,6 +287,7 @@ def finishStageTwo(testConfig, terminationToken, timeoutSec = 300):
             return False
     return True
 
+
 def generateBranchScript(branchString, logFile):
         gitScript = ""
         branchData = branchString.split('/')
@@ -283,12 +295,12 @@ def generateBranchScript(branchString, logFile):
         logMsg(logFile, "FRAMEWORK BRANCH LIST LENGTH: " + str(len((branchData))))
         
         if len(branchData) > 0 and ((branchData[0] == 'upstream' or branchData[0] == 'origin') or (len(branchData) == 1)):
-            #EITHER A COMMIT VERSION IN MASTER, PR OR upstream/master...... JUST USE WHAT THEY GAVE
+            # EITHER A COMMIT VERSION IN MASTER, PR OR upstream/master...... JUST USE WHAT THEY GAVE
             logMsg(logFile, "FRAMEWORK REPO TO USE: " + branchString)
             gitScript = "git checkout " + branchString + "\n"
         else:
             # NONSTANDARD REPO......
-            logMsg(logFile, "NONSTANDARD FRAMEWORK REPO DETECTED: " + testConfig['FRAMEWORK_BRANCH'])
+            logMsg(logFile, "NONSTANDARD FRAMEWORK REPO DETECTED: " + branchString)
             userName = branchData[0]
             logMsg(logFile, "NONSTANDARD FRAMEWORK USERNAME: " + userName)
             repoName = branchData[1]
@@ -300,6 +312,7 @@ def generateBranchScript(branchString, logFile):
             gitScript = gitScript + "git fetch  " + userName + "\n"
             gitScript = gitScript + "git checkout -b  " + branchName + ' ' + userName + '/' + branchName + "\n"
         return gitScript
+
 
 def getCreds(configData, logFile = "default.log"):
     if 'LOG_FILE' in configData:
@@ -338,12 +351,14 @@ def getCreds(configData, logFile = "default.log"):
                 vm['PASSWORD'] = password
     return True
 
+
 def getElement(element, vmName, credsDic):
     for credVmName in credsDic.keys():
         if vmName.strip() == credVmName:
             if element in credsDic[credVmName]:
                 return credsDic[credVmName][element]
     return False
+
 
 def getListFromFile(fileName):
     retList = []
@@ -356,6 +371,7 @@ def getListFromFile(fileName):
     logMsg(str(retList))
     return retList
 
+
 def getSessionCount(testConfig):
     sessionCount = 0
     for host in testConfig['TARGETS']:
@@ -363,8 +379,10 @@ def getSessionCount(testConfig):
             sessionCount = sessionCount + len(host['SESSION_DATASETS'])
     return sessionCount
 
+
 def getTimestamp():
     return str(time.time()).split('.')[0]
+
 
 def instantiateVmsAndServers(testConfig):
     testVms = []
@@ -399,6 +417,7 @@ def instantiateVmsAndServers(testConfig):
                 testVms.append(None)
     return testVms
 
+
 def launchStageThree(testConfig):
     for msfHost in testConfig['MSF_HOSTS']:
         localScriptName = testConfig['SCRIPT_DIR'] + "/stageThree_" + '-'.join(msfHost['IP_ADDRESS'].split('.')) + ".sh"
@@ -416,11 +435,10 @@ def launchStageThree(testConfig):
             return False
     return True
 
+
 def launchStageTwo(testConfig, terminationToken, schedDelay = 180):
-    stageTwoWaitNeeded = False
     stageTwoNeeded = False
     stageThreeNeeded = False
-    remoteInterpreter =     None
     addScheduleDelay = False
     for target in testConfig['TARGETS']:
         logMsg(testConfig['LOG_FILE'], "PROCESSING " + target['NAME'])
@@ -432,13 +450,13 @@ def launchStageTwo(testConfig, terminationToken, schedDelay = 180):
                     stageThreeNeeded = True
         if stageTwoNeeded:
             if 'VM_TOOLS_UPLOAD' in target['METHOD'].upper():
+                remoteInterpreter = None
                 escapedIp = 'x'.join(target['IP_ADDRESS'].split('.'))
                 logMsg(testConfig['LOG_FILE'], "I THINK " + target['NAME'] + " HAS IP ADDRESS " + target['IP_ADDRESS'])
                 if 'win' in target['NAME'].lower():
                     target['REMOTE_LOG'] = target['PAYLOAD_DIRECTORY'] + "\\stageTwoLog.txt"
                     target['STAGE_TWO_FILENAME'] = "stageTwoScript_" +  escapedIp + ".py"
                     remoteScriptName =  target['PAYLOAD_DIRECTORY'] + "\\" + target['STAGE_TWO_FILENAME']
-                    localScriptName =   testConfig['SCRIPT_DIR'] + "/" + target['STAGE_TWO_FILENAME']
                     remoteInterpreter = target['PYTHON']
                     target['STAGE_TWO_SCRIPT'] = target['STAGE_TWO_SCRIPT'] + \
                         makeStageTwoPyScript(target, testConfig['HTTP_PORT'], target['REMOTE_LOG'], terminationToken)
@@ -446,7 +464,6 @@ def launchStageTwo(testConfig, terminationToken, schedDelay = 180):
                     target['REMOTE_LOG'] = target['PAYLOAD_DIRECTORY'] + "/stageTwoLog.txt"
                     target['STAGE_TWO_FILENAME'] = "stageTwoScript_" +  escapedIp + ".sh"
                     remoteScriptName =  target['PAYLOAD_DIRECTORY'] + "/" + target['STAGE_TWO_FILENAME']
-                    localScriptName =   testConfig['SCRIPT_DIR'] + "/" + target['STAGE_TWO_FILENAME']
                     remoteInterpreter = None
                     target['STAGE_TWO_SCRIPT'] = target['STAGE_TWO_SCRIPT'] + \
                         makeStageTwoShScript(target, testConfig['HTTP_PORT'], target['REMOTE_LOG'], terminationToken)
@@ -471,13 +488,14 @@ def launchStageTwo(testConfig, terminationToken, schedDelay = 180):
         else:
             logMsg(testConfig['LOG_FILE'], "NO STAGE TWO REQUIRED FOR " + target['NAME'])
     if addScheduleDelay:
-        #IF WE SCHEDULED THE JOBS, ADD THE DELAY IN BEFORE WE BOTHER CHECKING ON THE PROGESS
+        # IF WE SCHEDULED THE JOBS, ADD THE DELAY IN BEFORE WE BOTHER CHECKING ON THE PROGESS
         realSleepTime = schedDelay + 60
         logMsg(testConfig['LOG_FILE'], "[INFO]: SLEEPING FOR " + str(realSleepTime) + " TO ALLOW SCHEDULED TASKS TO START")
         time.sleep(realSleepTime)
     else:
         logMsg(testConfig['LOG_FILE'], "NO STAGE TWO WAIT REQUIRED")
     return (True, stageTwoNeeded, stageThreeNeeded)
+
 
 def loadJson(fileName):
     """
@@ -509,7 +527,8 @@ def logMsg(logFile, strMsg):
     except IOError:
         return False
     return True
-    
+
+
 def logTargetData(testConfig):
     """
     DEBUG PRINT
@@ -525,6 +544,7 @@ def logTargetData(testConfig):
                 logMsg(testConfig['LOG_FILE'], sessionData['MODULE']['NAME'])
     return None
 
+
 def makeHtmlReport(targetData, msfHosts):
     htmlString = "<html>\n<head>\n<title>\n\tTEST RESULTS\n</title>\n</head>\n\n<body>\n"
     htmlString = htmlString + "<table border=\"1\">\n<tr><td>MSF_HOST NAME</td><td>MSF_HOST IP</td><td>MSF COMMIT VERSION</td><td>PCAP</td></tr>\n"
@@ -536,9 +556,6 @@ def makeHtmlReport(targetData, msfHosts):
     passedString = "<td bgcolor = \"#00cc00\">PASSED</td>"
     failedString = "<td bgcolor = \"#cc0000\">FAILED</td>"
     for host in targetData:
-        stageTwoFileName = "NONE?"
-        if 'STAGE_TWO_FILENAME' in host:
-            stageTwoFileName = host['STAGE_TWO_FILENAME']
         for sessionData in host['SESSION_DATASETS']:
             payloadFileName = "NO PAYLOAD FILE"
             payloadName = "NO PAYLOAD (AUX?)"
@@ -558,15 +575,16 @@ def makeHtmlReport(targetData, msfHosts):
                                     "<td>" + payloadName + "<br>" + payloadFileName + interpreter + "</td>"
             if 'STATUS' in sessionData:
                 if sessionData['STATUS']:
-                    htmlString = htmlString + "<td bgcolor = \"#00cc00\">PASSED</td>\n"
+                    htmlString = htmlString + passedString + "\n"
                 else:
-                    htmlString = htmlString + "<td bgcolor = \"#cc0000\">FAILED</td>\n"
+                    htmlString = htmlString + failedString + "\n"
             else:
                 htmlString = htmlString + "<td> NO STATUS LISTED?</td>\n"
             htmlString = htmlString + "<td><a href=" + sessionData['LOCAL_SESSION_FILE'] + ">SESSION CONTENT</a></td></tr>\n"
 
     htmlString = htmlString + "</table>\n</body>\n</html>\n"
     return htmlString
+
 
 def makeVenomCmd(targetData, sessionData, portNum, logFile):
     payloadData = sessionData['PAYLOAD']
@@ -603,6 +621,7 @@ def makeVenomCmd(targetData, sessionData, portNum, logFile):
     logMsg(logFile, "msfvenom cmd = " + msfVenomCmd)
     return msfVenomCmd
 
+
 def makeRcScript(cmdList, targetData, sessionData, logFile, portNum):
     if 'PAYLOAD' in sessionData:
         payloadName = sessionData['PAYLOAD']['NAME']
@@ -619,7 +638,7 @@ def makeRcScript(cmdList, targetData, sessionData, logFile, portNum):
     rubySleep = rubySleep + "echo '</ruby>' >> " + rcScriptName + '\n'
     rcScriptContent = rcScriptContent + "echo 'use " + sessionData['MODULE']['NAME'] + " ' > " + rcScriptName + "\n"
     if sessionData['MODULE']['NAME'] != 'exploit/multi/handler':
-        #THIS IS TERRIBLE, AND I WISH WE DID NOT HAVE TO DO THIS MAYBE ONLY FOR AUX LATER?
+        # THIS IS TERRIBLE, AND I WISH WE DID NOT HAVE TO DO THIS MAYBE ONLY FOR AUX LATER?
         rcScriptContent = rcScriptContent + "echo 'set RHOST " + targetData['IP_ADDRESS'] + " ' >> " + rcScriptName + "\n"
         rcScriptContent = rcScriptContent + "echo 'set RHOSTS " + targetData['IP_ADDRESS'] + " ' >> " + rcScriptName + "\n"
     for settingItem in sessionData['MODULE']['SETTINGS']:
@@ -667,6 +686,7 @@ def makeRcScript(cmdList, targetData, sessionData, logFile, portNum):
             rcScriptContent = rcScriptContent + rubySleep
     rcScriptContent = rcScriptContent + "echo 'exit -y' >> " + rcScriptName + '\n'
     return rcScriptContent    
+
 
 def makeStageTwoPyScript(targetData, httpPort, remoteLogFile, terminationToken):
     stageTwoPyContent = "# AUTOGENERATED TEST SCRIPT \n"
@@ -736,6 +756,7 @@ def makeStageTwoPyScript(targetData, httpPort, remoteLogFile, terminationToken):
 
     return stageTwoPyContent
 
+
 def makeStageTwoShScript(targetData, httpPort, remoteLogFile, terminationToken):
     stageTwoShContent = "# AUTOGENERATED TEST SCRIPT \n"
     stageTwoShContent = stageTwoShContent + "cd " + targetData['PAYLOAD_DIRECTORY'] + " \n"
@@ -756,6 +777,7 @@ def makeStageTwoShScript(targetData, httpPort, remoteLogFile, terminationToken):
             stageTwoShContent = stageTwoShContent + "echo " + terminationToken + " > " + remoteLogFile + "\n"
     return stageTwoShContent
 
+
 def parseHypervisorConfig(hypervisorConfigFile):
     try:
         fileObj = open(hypervisorConfigFile, 'r')
@@ -771,9 +793,8 @@ def parseHypervisorConfig(hypervisorConfigFile):
         return None
     return hypervisorData
 
+
 def parseTestConfig(configFile):
-    hasJavaPayload =    False
-    hasPythonPayload =  False
     try:
         fileObj = open(configFile, 'r')
         jsonString = fileObj.read()
@@ -789,6 +810,7 @@ def parseTestConfig(configFile):
     return jsonDic
 
 def prepConfig(args):
+    logFile = None
     configData = parseTestConfig(args.testfile)
     if None == configData:
         logMsg(logFile, "THERE WAS A PROBLEM WITH THE TEST JSON CONFIG FILE")
@@ -849,9 +871,7 @@ def prepConfig(args):
     """
     ADD LOGFILE TO THE configData DICTIONARY
     """
-    configData['LOG_FILE'] =    configData['REPORT_DIR'] + "/testlog.log"
-    logFile = configData['LOG_FILE']
-    
+    configData['LOG_FILE'] = configData['REPORT_DIR'] + "/testlog.log"
     
     if 'TARGET_GLOBALS' in configData:
         expandGlobalAttributes(configData)
@@ -860,6 +880,7 @@ def prepConfig(args):
         if getCreds(configData) == False:
             return None
     return configData
+
 
 def prepStagedScripts(testConfig, portNum):
     """
@@ -942,7 +963,6 @@ def prepStagedScripts(testConfig, portNum):
         host['STAGE_THREE_SCRIPT'] = host['STAGE_THREE_SCRIPT'] + "gem install bundler\n"
         host['STAGE_THREE_SCRIPT'] = host['STAGE_THREE_SCRIPT'] + "bundle install\n"
 
-    sleepBreak = "\nsleep(2)\n"
     sessionCounter = 0
     for host in testConfig['TARGETS']:
         host['LISTEN_PORTS'] = []
@@ -976,7 +996,7 @@ def prepStagedScripts(testConfig, portNum):
                                                                     sessionData, 
                                                                     portNum, 
                                                                     testConfig['LOG_FILE'])
-                #ADD VENOM COMMAND TO THE SCRIPT CONTENT
+                # ADD VENOM COMMAND TO THE SCRIPT CONTENT
                 stageOneContent = stageOneContent + sessionData['PAYLOAD']['VENOM_CMD'] + '\n'
                 stageOneContent = stageOneContent + 'mv ' + sessionData['PAYLOAD']['FILENAME'] + \
                                             ' ' + sessionData['MSF_HOST']['MSF_PAYLOAD_PATH'] + '/' +  sessionData['PAYLOAD']['FILENAME'] + '\n'
@@ -1008,6 +1028,7 @@ def prepStagedScripts(testConfig, portNum):
             sessionData['MSF_HOST']['STAGE_ONE_SCRIPT'] = sessionData['MSF_HOST']['STAGE_ONE_SCRIPT'] + stageOneContent
     return sessionCounter
 
+
 def prepTestVms(testConfig):
     """
     PREP ALL MSF_HOSTS AND TARGETS
@@ -1035,7 +1056,9 @@ def prepTestVms(testConfig):
             time.sleep(2)
     return testVms
 
+
 def pullMsfLogs(testConfig):
+    logFile = None
     for msfHost in testConfig['MSF_HOSTS']:
         msfHost['VM_OBJECT'].runCmdOnGuest(['/usr/bin/killall', 'tcpdump'])
         srcFile = msfHost['PCAP_FILE']
@@ -1065,7 +1088,6 @@ def pullMsfLogs(testConfig):
 def pullTargetLogs(testConfig):
     for target in testConfig['TARGETS']:
         for sessionData in target['SESSION_DATASETS']:
-            msfPath = sessionData['MSF_HOST']['MSF_PATH']
             remoteFileName = sessionData['RC_OUT_SCRIPT_NAME']
             logMsg(testConfig['LOG_FILE'], "RC_OUT_SCRIPT_NAME = " + str(sessionData['RC_OUT_SCRIPT_NAME']))
             logMsg(testConfig['LOG_FILE'], "SESSION_DIR = " + testConfig['SESSION_DIR'])
@@ -1089,7 +1111,7 @@ def replacePortKeywords(testConfig, portNum):
             logMsg(testConfig['LOG_FILE'], "PAYLOADS = " + str(target['PAYLOADS']))
             for payload in target['PAYLOADS']:
                 logMsg(testConfig['LOG_FILE'], str(payload))
-                #REPLACE THE STRING 'UNIQUE_PORT' WITH AN ACTUAL UNIQUE PORT
+                # REPLACE THE STRING 'UNIQUE_PORT' WITH AN ACTUAL UNIQUE PORT
 #                for settingItem in payload['SETTINGS']:
 #                    logMsg(testConfig['LOG_FILE'], "SETTING ITEM= " + settingItem + str(id(settingItem)))
 #                    logMsg(testConfig['LOG_FILE'], "SETTING ITEM= " + settingItem + str(id(settingItem)))
@@ -1104,6 +1126,7 @@ def replacePortKeywords(testConfig, portNum):
             for index in range(len(module['SETTINGS'])):
                 logMsg(testConfig['LOG_FILE'], "SETTING ITEM= " + module['SETTINGS'][index] + str(id(module['SETTINGS'][index])))
 
+
 def replaceWildcards(originalString, targetData, sessionData, portNum):
     if 'UNIQUE_PORT' in originalString:
         originalString = originalString.replace("UNIQUE_PORT", str(portNum.get()), 1)
@@ -1117,13 +1140,14 @@ def replaceWildcards(originalString, targetData, sessionData, portNum):
         originalString = originalString.replace("TARGET_PASSWORD", targetData['PASSWORD'], 1)
     return originalString
 
+
 def resetVms(testConfig):
     if testConfig == None or 'LOG_FILE' not in testConfig:
         return False
     retVal = True
     for hostKey in ['MSF_HOSTS', 'TARGETS']:
         if hostKey in testConfig:
-            for host in  (testConfig[hostKey]):
+            for host in (testConfig[hostKey]):
                 if host['TYPE'] == "VIRTUAL":
                     logMsg(testConfig['LOG_FILE'], "RESETTING VM " + host['NAME'])
                     if 'TEMP_SNAPSHOT' in host:
@@ -1136,27 +1160,29 @@ def resetVms(testConfig):
                         retVal = False
     return retVal
 
+
 def revertVm(vmObject, snapshot = None):
-    if vmObject == None:
+    if vmObject is None:
         return False
     vmObject.getSnapshots()
-    if snapshot != None:
+    if snapshot is not None:
         """
         JUST RETURN TO THE TESTING SNAPSHOT
         """
         return vmObject.revertToSnapshotByName(snapshot)
     else:
         """
-        JUST RESTED TO THE TEMP SNAPSHOT
+        JUST RESET TO THE TEMP SNAPSHOT
         """
         vmObject.snapshotList.sort(reverse=True)
         for i in vmObject.snapshotList:
             if "PAYLOAD_TESTING-" in i[0].name:
-                self.server.logMsg("REVERTING " + self.vmName + " TO " + i[0].name)
-                self.revertToSnapshot(i[0].snapshot)
-                self.deleteSnapshot(i[0].name)
+                vmObject.server.logMsg("REVERTING " + vmObject.vmName + " TO " + i[0].name)
+                vmObject.revertToSnapshot(i[0].snapshot)
+                vmObject.deleteSnapshot(i[0].name)
         vmObject.powerOff()
         return True
+
 
 def runTest(testConfig, portNum):
     """
@@ -1173,7 +1199,7 @@ def runTest(testConfig, portNum):
     if None in testVms:
         return False
 
-    #TAKE SNAPSHOT AND/OR SET THE VMS TO THE DESIRED SNAPSHOT AND POWERS ON
+    # TAKE SNAPSHOT AND/OR SET THE VMS TO THE DESIRED SNAPSHOT AND POWERS ON
     prepTestVms(testConfig)
     
     # WAIT UNTIL ALL VMS HAVE A WORKING TOOLS SERVICE AND AN IP ADDRESS
@@ -1185,9 +1211,6 @@ def runTest(testConfig, portNum):
     """
     if not setVmIPs(testConfig):
         return False
-
-    msfHostCount = len(testConfig['MSF_HOSTS'])
-    sessionCount = getSessionCount(testConfig)
 
     """
     CREATE REQUIRED DIRECTORY FOR PAYLOADS ON VM_TOOLS MANAGED MACHINES
@@ -1286,9 +1309,10 @@ def runTest(testConfig, portNum):
         fileObj.write(htmlReportString)
         fileObj.close()
     except IOError as e:
-        logMsg(logFile, "FAILED TO OPEN " + htmlFileName)
-        logMsg(logFile, "SYSTEM ERROR: \n" + str(e))
+        logMsg(testConfig['LOG_FILE'], "FAILED TO OPEN " + htmlFileName)
+        logMsg(testConfig['LOG_FILE'], "SYSTEM ERROR: \n" + str(e))
     return testResult
+
 
 def selectVms(vmList, posFilter=None):
     menuVms = []
@@ -1304,6 +1328,7 @@ def selectVms(vmList, posFilter=None):
     for i in feedbackList:
         selectedVmList.append(menuVms[int(i)])
     return selectedVmList
+
 
 def setupSessionData(testConfig):
     for target in testConfig['TARGETS']:
@@ -1326,6 +1351,7 @@ def setupSessionData(testConfig):
                 target['SESSION_DATASETS'].append(tempDic)
     return True
 
+
 def setVmIPs(testConfig):
     for host in testConfig['MSF_HOSTS'] + testConfig['TARGETS']:
         if host['TYPE'].upper() == 'VIRTUAL' and 'IP_ADDRESS' not in host and 'VM_OBJECT' in host:
@@ -1333,6 +1359,7 @@ def setVmIPs(testConfig):
         if 'IP_ADDRESS' not in host:
             return False
     return True
+
 
 def verifyConfig(jsonDic):
     """
@@ -1397,11 +1424,12 @@ def verifyConfig(jsonDic):
                 requiredTargetData.append("METERPRETER_PYTHON")
         for requiredItem in requiredTargetData:
             if requiredItem not in target:
-                print("NO " + requiredItem + " LISTED FOR " + target['NAME'] + " IN " + configFile)
+                print("NO " + requiredItem + " LISTED FOR " + target['NAME'] + " IN " + jsonDic)
                 configPassed = False
         if not configPassed:
             return False
     return True
+
 
 def waitForHttpServer(msfHosts, logFile, httpPort):
     """
@@ -1444,12 +1472,9 @@ def waitForHttpServer(msfHosts, logFile, httpPort):
                         host['SCRIPT_COMPLETE'] = True
     return True
 
+
 def waitForMeterpreters(testConfig, sessionCounter, timeoutSec = 500):
     modCounter = 0
-    msfDone = False
-    loopCounter = 0
-    msfConsoleCount = 1
-    maxLoops = timeoutSec
     previousCount = 0
     currentCount = 0
     staticCount = 0
@@ -1460,14 +1485,12 @@ def waitForMeterpreters(testConfig, sessionCounter, timeoutSec = 500):
                 break
             previousCount = currentCount
             currentCount = 0
-            msfDone = True
             for msfHost in testConfig['MSF_HOSTS']:
                 msfHost['VM_OBJECT'].updateProcList()
                 msfConsoleCount = 0
                 for procEntry in msfHost['VM_OBJECT'].procList:
                     if 'msfconsole' in procEntry:
                         msfConsoleCount = msfConsoleCount + 1
-                        msfDone = False
                         currentCount = currentCount + msfConsoleCount
                 if currentCount < previousCount:
                     finishedSpawning = True
@@ -1483,6 +1506,7 @@ def waitForMeterpreters(testConfig, sessionCounter, timeoutSec = 500):
     except KeyboardInterrupt:
         print("CAUGHT KEYBOARD INTERRUPT; SKIPPING THE NORMAL WAIT BUT PROCESSING THE DATA AND REVERTING VMS")
     return None
+
 
 def waitForMsfPayloads(msfHosts, reportDir, logFile, timeoutSec = 300):
     """
@@ -1510,7 +1534,7 @@ def waitForMsfPayloads(msfHosts, reportDir, logFile, timeoutSec = 300):
                         netstatFile.close()
                     except Exception as e:
                         logMsg(logFile, "FAILED READING NETSTAT FILE: " + localFile + "\n" + str(e))
-                        #IF WE DID NOT GET A  FILE, WE CANNOT SAY THAT THE PORTS ARE READY
+                        # IF WE DID NOT GET A  FILE, WE CANNOT SAY THAT THE PORTS ARE READY
                         netstatData = ""
                         pass
                     for port in host['LISTEN_PORTS']:
@@ -1538,6 +1562,7 @@ def waitForMsfPayloads(msfHosts, reportDir, logFile, timeoutSec = 300):
             print("CAUGHT KEYBOARD INTERRUPT; ABORTING TEST AND RESETTING VMS....")
             return False
     return True
+
 
 def waitForVms(vmList):
     """

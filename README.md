@@ -132,4 +132,12 @@ Within that directory, there will be three directories:
 * `scripts` contains the scripts generated to support the tests and kept to aid debugging.
 * `sessions` contains the rc scripts sent to Framework and the text of the session (hopefully) generated.  The sessions are linked from the report.html file.
 
-
+## Executing tests with Docker
+```
+cd payload-testing/docker
+docker build -t rapid7/build:payload-testing .
+docker run --rm=true --tty -u jenkins \
+    --volume=${PATH_TO_WORKING_DIR}:/r7-source \
+    --workdir=/r7-source/payload-testing rapid7/build:payload-testing \
+    bash -l -c "python autoPayloadTest.py ${DOCKER_RELATIVE_PATH_TO_TEST_JSON}"
+```

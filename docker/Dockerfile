@@ -28,6 +28,7 @@ RUN echo 'eval "$(pyenv init -)"' >> $JENKINS_HOME/.bash_profile
 RUN echo 'eval "$(pyenv virtualenv-init -)"' >> $JENKINS_HOME/.bash_profile
 
 RUN su jenkins -c "/bin/bash -l -c 'pyenv install 2.7.13 && pyenv global 2.7.13'"
+RUN su jenkins -c "/bin/bash -l -c 'pip install --upgrade cpe-utils'"
 RUN su jenkins -c "/bin/bash -l -c 'pip install --upgrade pyvmomi'"
 RUN su jenkins -c "/bin/bash -l -c 'pip install --upgrade vm-automation'"
 

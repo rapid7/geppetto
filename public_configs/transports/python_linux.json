@@ -16,7 +16,7 @@
 	"TARGETS":
 	[
 		{
-			"NAME": 		"ubuntu1604"
+			"CPE": 			"cpe:/o:canonical:ubuntu_linux:16.04::lts"
 		}
 	],
 	"TARGET_GLOBALS":

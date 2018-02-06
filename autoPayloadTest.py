@@ -17,6 +17,12 @@ def main():
     configData = apt_shared.prepConfig(args)
 
     """
+    PROCESS TARGETS INTO KNOWN VMS
+    """
+    configData['TARGETS'] = apt_shared.convertAbstractTargets(configData['TARGETS'], configData['CREDS_FILE'], configData['LOG_FILE'])
+    configData['MSF_HOSTS'] = apt_shared.confirmMsfHosts(configData['MSF_HOSTS'], configData['CREDS_FILE'], configData['LOG_FILE'])
+
+    """
     IF GLOBAL PAYLOADS OR MODULES ARE LISTED, FILTER THEM AS BEST WE CAN AND ADD THEM TO EACH TARGET
     NB: I THINK USING GLOBAL EXPLOITS IS A TERRIBLE IDEA, BUT I AM AN ENABLER
     """
@@ -44,11 +50,6 @@ def main():
     # DEBUG PRINT
     apt_shared.logTargetData(configData)
 
-    """
-    PROCESS TARGETS INTO KNOWN VMS
-    """
-    configData['TARGETS'] = apt_shared.convertAbstractTargets(configData['TARGETS'], configData['CREDS_FILE'], configData['LOG_FILE'])
-    configData['MSF_HOSTS'] = apt_shared.confirmMsfHosts(configData['MSF_HOSTS'], configData['CREDS_FILE'], configData['LOG_FILE'])
 
     """
     PROCESS CLONES

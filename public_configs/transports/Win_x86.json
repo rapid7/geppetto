@@ -16,7 +16,7 @@
 	"TARGETS":
 	[
 		{
-			"NAME": 		"Win10x86_1709"
+			"CPE":			"cpe:/o:microsoft:windows_10:1709::x86"
 		}
 	],
 	"TARGET_GLOBALS":

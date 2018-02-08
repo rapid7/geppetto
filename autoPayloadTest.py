@@ -13,7 +13,14 @@ def main():
     parser.add_argument("testfile", help="json test file to use")
     args = parser.parse_args()
 
+    # REMOVED credential processing from prepConfig, now performed during convertAbstractTarget and confirmMsfHosts
     configData = apt_shared.prepConfig(args)
+
+    """
+    PROCESS TARGETS INTO KNOWN VMS
+    """
+    configData['TARGETS'] = apt_shared.convertAbstractTargets(configData['TARGETS'], configData['CREDS_FILE'], configData['LOG_FILE'])
+    configData['MSF_HOSTS'] = apt_shared.confirmMsfHosts(configData['MSF_HOSTS'], configData['CREDS_FILE'], configData['LOG_FILE'])
 
     """
     IF GLOBAL PAYLOADS OR MODULES ARE LISTED, FILTER THEM AS BEST WE CAN AND ADD THEM TO EACH TARGET
@@ -42,7 +49,8 @@ def main():
 
     # DEBUG PRINT
     apt_shared.logTargetData(configData)
-            
+
+
     """
     PROCESS CLONES
     NOW THAT THE PAYLOAD AND EXPLOIT DATA IS NEATLY PLACED INTO THE SESSION_DATASETS LIST, WHEN WE PROCESS CLONES,
@@ -51,7 +59,7 @@ def main():
     """
     apt_shared.breakoutClones(configData['MSF_HOSTS'], configData['LOG_FILE'])
     apt_shared.breakoutClones(configData['TARGETS'], configData['LOG_FILE'])
-    
+
     """
     EXPAND COMMAND_LIST AND SUCCESS_LIST TO ALL TARGETS
     """

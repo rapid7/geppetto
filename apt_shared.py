@@ -3,8 +3,7 @@ import os
 import time
 import json
 import vm_automation
-from __builtin__ import False
-
+from lib import SystemCatalog
 
 #
 # GOT TIRED OF TRACKING THIS DATA IN A LIST
@@ -98,18 +97,26 @@ def checkData(testConfig):
             sessionData['STATUS'] = statusFlag
             if statusFlag:
                 logMsg(testConfig['LOG_FILE'], sessionData['LOCAL_SESSION_FILE'])
-                logMsg(testConfig['LOG_FILE'], "TEST PASSED: " + \
-                       target['NAME'] + ':' + \
-                       payloadName + ":" + \
+                logMsg(testConfig['LOG_FILE'], "TEST PASSED: " +
+                       target['NAME'] + ':' +
+                       payloadName + ":" +
                        sessionData['MODULE']['NAME'])
             else:
                 testResult = False
                 logMsg(testConfig['LOG_FILE'], sessionData['LOCAL_SESSION_FILE'])
-                logMsg(testConfig['LOG_FILE'], "TEST FAILED: " + \
-                        target['NAME'] + ':' + \
-                        payloadName + ":" + \
-                        sessionData['MODULE']['NAME'])
+                logMsg(testConfig['LOG_FILE'], "TEST FAILED: " +
+                       target['NAME'] + ':' +
+                       payloadName + ":" +
+                       sessionData['MODULE']['NAME'])
     return testResult
+
+
+def convertAbstractTargets(targetList, catalog_file, logFile):
+    return __matchListToCatalog(targetList, catalog_file, logFile)
+
+
+def confirmMsfHosts(hostList, catalog_file, logFile):
+    return __matchListToCatalog(hostList, catalog_file, logFile)
 
 
 def createServer(configFile, logFile = "default.log"):
@@ -164,19 +171,20 @@ def expandPayloadsAndModules(testConfig):
         if 'PAYLOADS' in testConfig:
             for payload in testConfig['PAYLOADS']:
                 if 'x64' not in target['NAME'].lower() and 'x64' in payload['NAME'].lower():
-                    #MISMATCHED ARCH; BAIL
+                    # MISMATCHED ARCH; BAIL
                     continue
                 if 'win' in target['NAME'].lower() and 'mettle' in payload['NAME'].lower():
-                    #DO ONT USE METTLE PAYLOADS ON WINDOWS
+                    # DO ONT USE METTLE PAYLOADS ON WINDOWS
                     continue
                 if 'win' not in target['NAME'].lower() and 'win' in payload['NAME'].lower():
-                    #ONLY USE WIN PAYLOADS ON WIN
+                    # ONLY USE WIN PAYLOADS ON WIN
                     continue
                 else:
                     logMsg(testConfig['LOG_FILE'], "ADDING " + str(payload))
-                    tempPayload = {}
-                    tempPayload['NAME'] = payload['NAME']
-                    tempPayload['SETTINGS'] = payload['SETTINGS'][:]
+                    tempPayload = {
+                        'NAME': payload['NAME'],
+                        'SETTINGS': payload['SETTINGS'][:]
+                    }
                     target['PAYLOADS'].append(tempPayload)
                 # TODO: ADD A CHECK SO WE DO NOT HAVE MULTIPLE SIMILAR MODULES
         if 'MODULES' in testConfig:
@@ -312,44 +320,6 @@ def generateBranchScript(branchString, logFile):
             gitScript = gitScript + "git fetch  " + userName + "\n"
             gitScript = gitScript + "git checkout -b  " + branchName + ' ' + userName + '/' + branchName + "\n"
         return gitScript
-
-
-def getCreds(configData, logFile = "default.log"):
-    if 'LOG_FILE' in configData:
-        logFile = configData['LOG_FILE']
-    try:
-        credsFile = open(configData['CREDS_FILE'], 'r')
-        credsStr = credsFile.read()
-        credsFile.close()
-    except IOError as e:
-        logMsg(logFile, "UNABLE TO OPEN FILE: " + str(configData['CREDS_FILE']) + '\n' + str(e))
-        return False
-    try:
-        credsDic = json.loads(credsStr)
-    except Exception as e:
-        logMsg(logFile, "UNABLE TO PARSE FILE: " + str(configData['CREDS_FILE']) + '\n' + str(e))
-        return False
-    
-    vmList = configData['MSF_HOSTS'] + configData['TARGETS']
-    
-    for vm in vmList:
-        if 'USERNAME' not in vm:
-            logMsg(logFile, "NO USERNAME FOR " + str(vm['NAME']) + '\n')
-            username = getElement('USERNAME', vm['NAME'],  credsDic)
-            if username == False:
-                return False
-            else:
-                logMsg(logFile, "FOUND USERNAME FOR " + str(vm['NAME']) + '\n')
-                vm['USERNAME'] = username
-        if 'PASSWORD' not in vm:
-            logMsg(logFile, "NO PASSWORD FOR " + str(vm['NAME']) + '\n')
-            password = getElement('PASSWORD', vm['NAME'],  credsDic)
-            if password == False:
-                return False
-            else:
-                logMsg(logFile, "FOUND PASSWORD FOR " + str(vm['NAME']) + '\n')
-                vm['PASSWORD'] = password
-    return True
 
 
 def getElement(element, vmName, credsDic):
@@ -876,9 +846,6 @@ def prepConfig(args):
     if 'TARGET_GLOBALS' in configData:
         expandGlobalAttributes(configData)
 
-    if 'CREDS_FILE' in configData:
-        if getCreds(configData) == False:
-            return None
     return configData
 
 
@@ -1503,6 +1470,8 @@ def waitForMeterpreters(testConfig, sessionCounter, timeoutSec = 500):
                 time.sleep(1)
                 if modCounter % 10 == 0:
                     logMsg(testConfig['LOG_FILE'], str(msfConsoleCount) + " msfconsole PROCESSES STILL RUNNING ON " + msfHost['NAME'])
+            if msfConsoleCount == 0:
+                break
     except KeyboardInterrupt:
         print("CAUGHT KEYBOARD INTERRUPT; SKIPPING THE NORMAL WAIT BUT PROCESSING THE DATA AND REVERTING VMS")
     return None
@@ -1575,4 +1544,24 @@ def waitForVms(vmList):
     return True
 
 
-
+def __matchListToCatalog(vm_List, catalog_file, logFile="default.log"):
+    my_catalog = SystemCatalog(catalog_file)
+    defined_vms = []
+    for vm in vm_List:
+        if 'CPE' in vm:
+            local_target = my_catalog.findByCPE(vm['CPE'])
+        elif 'OS' in vm:
+            local_target = my_catalog.findByOS(vm['OS'])
+        else:
+            local_target = my_catalog.findByName(vm['NAME'])
+        if local_target is not None:
+            final_vm = vm.copy()
+            final_vm.update(local_target)
+            if "USERNAME" not in final_vm:
+                logMsg(logFile, "NO USERNAME FOR " + str(vm))
+                return False
+            if "PASSWORD" not in final_vm:
+                logMsg(logFile, "NO PASSWORD FOR " + str(vm))
+                return False
+            defined_vms.append(final_vm)
+    return defined_vms

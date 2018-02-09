@@ -1557,11 +1557,13 @@ def __matchListToCatalog(vm_List, catalog_file, logFile="default.log"):
         if local_target is not None:
             final_vm = vm.copy()
             final_vm.update(local_target)
-            if "USERNAME" not in final_vm:
-                logMsg(logFile, "NO USERNAME FOR " + str(vm))
-                return False
-            if "PASSWORD" not in final_vm:
-                logMsg(logFile, "NO PASSWORD FOR " + str(vm))
-                return False
-            defined_vms.append(final_vm)
+        else:
+            final_vm = vm
+        if "USERNAME" not in final_vm:
+            logMsg(logFile, "NO USERNAME FOR " + str(vm))
+            return False
+        if "PASSWORD" not in final_vm:
+            logMsg(logFile, "NO PASSWORD FOR " + str(vm))
+            return False
+        defined_vms.append(final_vm)
     return defined_vms

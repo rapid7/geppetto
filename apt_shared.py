@@ -249,7 +249,7 @@ def checkStagesNeeded(targetData):
     stageTwoNeeded = False
     stageThreeNeeded = False
     for sessionData in targetData['SESSION_DATASETS']:
-        if 'PAYLOAD' in sessionData:
+        if 'PAYLOAD' in sessionData and 'VM_TOOLS_UPLOAD' in targetData['METHOD'].upper():
             stageTwoNeeded = True
             if 'bind' in sessionData['PAYLOAD']['NAME']:
                 stageThreeNeeded = True
@@ -1208,7 +1208,7 @@ def runTest(testConfig, portNum):
         return False
     else:
         stageTwoNeeded = stageTwoResults[1]
-        stageThreeNeeded = stageTwoResults[1]
+        stageThreeNeeded = stageTwoResults[2]
     
     """
     IF WE LAUNCHED STAGE TWO, WAIT FOR THE SCRIPTS TO COMPLETE

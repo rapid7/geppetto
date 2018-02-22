@@ -248,9 +248,11 @@ def finishAndLaunchStageOne(msfHosts, httpPort, logFile):
 def checkStagesNeeded(targetData):
     stageTwoNeeded = False
     stageThreeNeeded = False
-    for sessionData in targetData['SESSION_DATASETS']:
-        if 'PAYLOAD' in sessionData and 'VM_TOOLS_UPLOAD' in targetData['METHOD'].upper():
-            stageTwoNeeded = True
+    if 'VM_TOOLS_UPLOAD' == targetData['METHOD'].upper():
+        for sessionData in targetData['SESSION_DATASETS']:
+            if 'PAYLOAD' in sessionData:
+                stageTwoNeeded = True
+                print("STAGE TWO NEEDED!")
             if 'bind' in sessionData['PAYLOAD']['NAME']:
                 stageThreeNeeded = True
     return (stageTwoNeeded, stageThreeNeeded)
@@ -407,17 +409,10 @@ def launchStageThree(testConfig):
 
 
 def launchStageTwo(testConfig, terminationToken, schedDelay = 180):
-    stageTwoNeeded = False
-    stageThreeNeeded = False
     addScheduleDelay = False
     for target in testConfig['TARGETS']:
         logMsg(testConfig['LOG_FILE'], "PROCESSING " + target['NAME'])
         stageTwoNeeded, stageThreeNeeded = checkStagesNeeded(target)
-        for sessionData in target['SESSION_DATASETS']:
-            if 'PAYLOAD' in sessionData:
-                stageTwoNeeded = True
-                if 'bind' in sessionData['PAYLOAD']['NAME']:
-                    stageThreeNeeded = True
         if stageTwoNeeded:
             if 'VM_TOOLS_UPLOAD' in target['METHOD'].upper():
                 remoteInterpreter = None
@@ -490,12 +485,15 @@ def logMsg(logFile, strMsg):
     if strMsg == None:
         strMsg="[None]"
     dateStamp = 'testlog:[' + str(datetime.now())+ '] '
-    try:
-        logFileObj = open(logFile, 'a')
-        logFileObj.write(dateStamp + strMsg +'\n')
-        logFileObj.close()
-    except IOError:
+    if logFile == None:
         return False
+    else:
+        try:
+            logFileObj = open(logFile, 'a')
+            logFileObj.write(dateStamp + strMsg +'\n')
+            logFileObj.close()
+        except IOError:
+            return False
     return True
 
 

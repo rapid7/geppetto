@@ -252,7 +252,6 @@ def checkStagesNeeded(targetData):
         for sessionData in targetData['SESSION_DATASETS']:
             if 'PAYLOAD' in sessionData:
                 stageTwoNeeded = True
-                print("STAGE TWO NEEDED!")
             if 'bind' in sessionData['PAYLOAD']['NAME']:
                 stageThreeNeeded = True
     return (stageTwoNeeded, stageThreeNeeded)
@@ -1456,13 +1455,13 @@ def waitForMeterpreters(testConfig, sessionCounter, timeoutSec = 500):
                 for procEntry in msfHost['VM_OBJECT'].procList:
                     if 'msfconsole' in procEntry:
                         msfConsoleCount = msfConsoleCount + 1
-                        currentCount = currentCount + msfConsoleCount
+                currentCount = currentCount + msfConsoleCount
                 logMsg(testConfig['LOG_FILE'], str(msfConsoleCount) + " msfconsole PROCESSES STILL RUNNING ON " + msfHost['NAME'])
+            logMsg(testConfig['LOG_FILE'], "CURRENT COUNT [" + str(currentCount) +"]")
+            logMsg(testConfig['LOG_FILE'], "PREVIOUS COUNT [" + str(previousCount) +"]")
             if currentCount < previousCount:
                 finishedSpawning = True
             if currentCount == previousCount:
-                logMsg(testConfig['LOG_FILE'], "CURRENT COUNT [" + str(currentCount) +"]")
-                logMsg(testConfig['LOG_FILE'], "PREVIOUS COUNT [" + str(previousCount) +"]")
                 logMsg(testConfig['LOG_FILE'], "NO CHANGE IN METERPRETER PROCESS COUNT [" + str(staticCount) +"]")
                 staticCount = staticCount + 1
             else:

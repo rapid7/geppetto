@@ -1446,7 +1446,7 @@ def waitForMeterpreters(testConfig, sessionCounter, timeoutSec = 500):
     finishedSpawning = False
     try:
         for i in range(timeoutSec):
-            if finishedSpawning and staticCount > 25:
+            if finishedSpawning and staticCount > 5:
                 break
             previousCount = currentCount
             currentCount = 0
@@ -1457,18 +1457,18 @@ def waitForMeterpreters(testConfig, sessionCounter, timeoutSec = 500):
                     if 'msfconsole' in procEntry:
                         msfConsoleCount = msfConsoleCount + 1
                         currentCount = currentCount + msfConsoleCount
-                if currentCount < previousCount:
-                    finishedSpawning = True
-                if currentCount == previousCount:
-                    logMsg(testConfig['LOG_FILE'], "NO CHANGE IN METERPRETER PROCESS COUNT [" + str(staticCount) +"]")
-                    staticCount = staticCount + 1
-                else:
-                    staticCount = 0
-                        
-                time.sleep(1)
-                if modCounter % 10 == 0:
-                    logMsg(testConfig['LOG_FILE'], str(msfConsoleCount) + " msfconsole PROCESSES STILL RUNNING ON " + msfHost['NAME'])
-            if msfConsoleCount == 0:
+                logMsg(testConfig['LOG_FILE'], str(msfConsoleCount) + " msfconsole PROCESSES STILL RUNNING ON " + msfHost['NAME'])
+            if currentCount < previousCount:
+                finishedSpawning = True
+            if currentCount == previousCount:
+                logMsg(testConfig['LOG_FILE'], "CURRENT COUNT [" + str(currentCount) +"]")
+                logMsg(testConfig['LOG_FILE'], "PREVIOUS COUNT [" + str(previousCount) +"]")
+                logMsg(testConfig['LOG_FILE'], "NO CHANGE IN METERPRETER PROCESS COUNT [" + str(staticCount) +"]")
+                staticCount = staticCount + 1
+            else:
+                staticCount = 0
+            time.sleep(5)
+            if currentCount == 0:
                 break
     except KeyboardInterrupt:
         print("CAUGHT KEYBOARD INTERRUPT; SKIPPING THE NORMAL WAIT BUT PROCESSING THE DATA AND REVERTING VMS")

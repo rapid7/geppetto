@@ -1444,8 +1444,8 @@ def waitForMeterpreters(testConfig, sessionCounter, timeoutSec = 500):
     staticCount = 0
     finishedSpawning = False
     try:
-        for i in range(timeoutSec):
-            if finishedSpawning and staticCount > 5:
+        for i in range(timeoutSec/10):
+            if finishedSpawning and staticCount > 15:
                 break
             previousCount = currentCount
             currentCount = 0

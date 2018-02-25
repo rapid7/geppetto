@@ -248,9 +248,10 @@ def finishAndLaunchStageOne(msfHosts, httpPort, logFile):
 def checkStagesNeeded(targetData):
     stageTwoNeeded = False
     stageThreeNeeded = False
-    for sessionData in targetData['SESSION_DATASETS']:
-        if 'PAYLOAD' in sessionData:
-            stageTwoNeeded = True
+    if 'VM_TOOLS_UPLOAD' == targetData['METHOD'].upper():
+        for sessionData in targetData['SESSION_DATASETS']:
+            if 'PAYLOAD' in sessionData:
+                stageTwoNeeded = True
             if 'bind' in sessionData['PAYLOAD']['NAME']:
                 stageThreeNeeded = True
     return (stageTwoNeeded, stageThreeNeeded)
@@ -407,17 +408,10 @@ def launchStageThree(testConfig):
 
 
 def launchStageTwo(testConfig, terminationToken, schedDelay = 180):
-    stageTwoNeeded = False
-    stageThreeNeeded = False
     addScheduleDelay = False
     for target in testConfig['TARGETS']:
         logMsg(testConfig['LOG_FILE'], "PROCESSING " + target['NAME'])
         stageTwoNeeded, stageThreeNeeded = checkStagesNeeded(target)
-        for sessionData in target['SESSION_DATASETS']:
-            if 'PAYLOAD' in sessionData:
-                stageTwoNeeded = True
-                if 'bind' in sessionData['PAYLOAD']['NAME']:
-                    stageThreeNeeded = True
         if stageTwoNeeded:
             if 'VM_TOOLS_UPLOAD' in target['METHOD'].upper():
                 remoteInterpreter = None
@@ -490,12 +484,15 @@ def logMsg(logFile, strMsg):
     if strMsg == None:
         strMsg="[None]"
     dateStamp = 'testlog:[' + str(datetime.now())+ '] '
-    try:
-        logFileObj = open(logFile, 'a')
-        logFileObj.write(dateStamp + strMsg +'\n')
-        logFileObj.close()
-    except IOError:
+    if logFile == None:
         return False
+    else:
+        try:
+            logFileObj = open(logFile, 'a')
+            logFileObj.write(dateStamp + strMsg +'\n')
+            logFileObj.close()
+        except IOError:
+            return False
     return True
 
 
@@ -1208,7 +1205,7 @@ def runTest(testConfig, portNum):
         return False
     else:
         stageTwoNeeded = stageTwoResults[1]
-        stageThreeNeeded = stageTwoResults[1]
+        stageThreeNeeded = stageTwoResults[2]
     
     """
     IF WE LAUNCHED STAGE TWO, WAIT FOR THE SCRIPTS TO COMPLETE
@@ -1447,8 +1444,8 @@ def waitForMeterpreters(testConfig, sessionCounter, timeoutSec = 500):
     staticCount = 0
     finishedSpawning = False
     try:
-        for i in range(timeoutSec):
-            if finishedSpawning and staticCount > 25:
+        for i in range(timeoutSec/10):
+            if finishedSpawning and staticCount > 15:
                 break
             previousCount = currentCount
             currentCount = 0
@@ -1458,19 +1455,19 @@ def waitForMeterpreters(testConfig, sessionCounter, timeoutSec = 500):
                 for procEntry in msfHost['VM_OBJECT'].procList:
                     if 'msfconsole' in procEntry:
                         msfConsoleCount = msfConsoleCount + 1
-                        currentCount = currentCount + msfConsoleCount
-                if currentCount < previousCount:
-                    finishedSpawning = True
-                if currentCount == previousCount:
-                    logMsg(testConfig['LOG_FILE'], "NO CHANGE IN METERPRETER PROCESS COUNT [" + str(staticCount) +"]")
-                    staticCount = staticCount + 1
-                else:
-                    staticCount = 0
-                        
-                time.sleep(1)
-                if modCounter % 10 == 0:
-                    logMsg(testConfig['LOG_FILE'], str(msfConsoleCount) + " msfconsole PROCESSES STILL RUNNING ON " + msfHost['NAME'])
-            if msfConsoleCount == 0:
+                currentCount = currentCount + msfConsoleCount
+                logMsg(testConfig['LOG_FILE'], str(msfConsoleCount) + " msfconsole PROCESSES STILL RUNNING ON " + msfHost['NAME'])
+            logMsg(testConfig['LOG_FILE'], "CURRENT COUNT [" + str(currentCount) +"]")
+            logMsg(testConfig['LOG_FILE'], "PREVIOUS COUNT [" + str(previousCount) +"]")
+            if currentCount < previousCount:
+                finishedSpawning = True
+            if currentCount == previousCount:
+                logMsg(testConfig['LOG_FILE'], "NO CHANGE IN METERPRETER PROCESS COUNT [" + str(staticCount) +"]")
+                staticCount = staticCount + 1
+            else:
+                staticCount = 0
+            time.sleep(5)
+            if currentCount == 0:
                 break
     except KeyboardInterrupt:
         print("CAUGHT KEYBOARD INTERRUPT; SKIPPING THE NORMAL WAIT BUT PROCESSING THE DATA AND REVERTING VMS")

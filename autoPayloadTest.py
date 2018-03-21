@@ -8,7 +8,7 @@ def main():
     parser.add_argument("-v", "--verbose", help="Echo test result to console", action="store_true")
     parser.add_argument("-f", "--framework", help="Framework branch to use (Overrides testfile)")
     parser.add_argument("-m", "--module", help="Module to use")
-    parser.add_argument("-t", "--targetName", help="Overwrite first Target Name in Config File")
+    parser.add_argument("-t", "--targetName", help="Target CPE/OS/NAME to use (Overrides testfile)")
     parser.add_argument("-p", "--payload", help="Meterpreter payload to use")
     parser.add_argument("-po", "--payloadoptions", help="Comma delineated venom-style settings for the given payload: attribute=x,attribute2=y...")
     parser.add_argument("testfile", help="json test file to use")

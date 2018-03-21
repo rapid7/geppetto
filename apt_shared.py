@@ -787,8 +787,15 @@ def prepConfig(args):
         exit(999)
         
     if args.targetName != None:
-        print("REPLACING TARGET " + str(configData['TARGETS'][0]['NAME']) + " WITH " + str(args.targetName))
-        configData['TARGETS'][0]['NAME'] = str(args.targetName)
+        logMsg(logFile, "REPLACING ALL TARGETS WITH SINGLE TARGET " + str(args.targetName))
+        newTargets = []
+        targetOverride = { 'CPE': str(args.targetName),
+                           'OS': str(args.targetName),
+                           'NAME': str(args.targetName) } 
+        mergedTarget = configData['TARGETS'][0].copy()
+        mergedTarget.update(targetOverride)
+        newTargets.append(mergedTarget)
+        configData['TARGETS'] = newTargets
 
     if args.framework != None:
         configData['FRAMEWORK_BRANCH'] = args.framework

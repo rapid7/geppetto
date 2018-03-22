@@ -22,6 +22,12 @@ def main():
     """
     configData['TARGETS'] = apt_shared.convertAbstractTargets(configData['TARGETS'], configData['CREDS_FILE'], configData['LOG_FILE'])
     configData['MSF_HOSTS'] = apt_shared.confirmMsfHosts(configData['MSF_HOSTS'], configData['CREDS_FILE'], configData['LOG_FILE'])
+    if type(configData['TARGETS']) == bool:
+        print("NO TARGETS FOUND IN CATALOG")
+        exit(999)
+    if type(configData['MSF_HOSTS']) == bool:
+        print("NO MSF_HOSTS FOUND IN CATALOG")
+        exit(999)
 
     """
     IF GLOBAL PAYLOADS OR MODULES ARE LISTED, FILTER THEM AS BEST WE CAN AND ADD THEM TO EACH TARGET

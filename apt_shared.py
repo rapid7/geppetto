@@ -365,9 +365,12 @@ def instantiateVmsAndServers(testConfig):
             if target['HYPERVISOR_CONFIG'] in hypervisorDic:
                 target['SERVER_OBJECT'] = hypervisorDic[target['HYPERVISOR_CONFIG']]
             else:
-                 hypervisorDic[target['HYPERVISOR_CONFIG']] = createServer(target['HYPERVISOR_CONFIG'], logFile)
-                 target['SERVER_OBJECT'] = hypervisorDic[target['HYPERVISOR_CONFIG']]
-                 target['SERVER_OBJECT'].enumerateVms()
+                hypervisorDic[target['HYPERVISOR_CONFIG']] = createServer(target['HYPERVISOR_CONFIG'], logFile)
+                target['SERVER_OBJECT'] = hypervisorDic[target['HYPERVISOR_CONFIG']]
+                if target['SERVER_OBJECT'] == None:
+                    logMsg(logFile, "NO SERVER FOUND FOR: " + target['NAME'])
+                    return []
+                target['SERVER_OBJECT'].enumerateVms()
             """
             INSTANTIATE VM INSTANCE AND STORE IT IN THE DICTIONARY
             """
@@ -782,6 +785,17 @@ def prepConfig(args):
     if None == configData:
         logMsg(logFile, "THERE WAS A PROBLEM WITH THE TEST JSON CONFIG FILE")
         exit(999)
+        
+    if args.targetName != None:
+        logMsg(logFile, "REPLACING ALL TARGETS WITH SINGLE TARGET " + str(args.targetName))
+        newTargets = []
+        targetOverride = { 'CPE': str(args.targetName),
+                           'OS': str(args.targetName),
+                           'NAME': str(args.targetName) } 
+        mergedTarget = configData['TARGETS'][0].copy()
+        mergedTarget.update(targetOverride)
+        newTargets.append(mergedTarget)
+        configData['TARGETS'] = newTargets
 
     if args.framework != None:
         configData['FRAMEWORK_BRANCH'] = args.framework

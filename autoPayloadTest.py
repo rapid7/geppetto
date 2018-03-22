@@ -8,6 +8,7 @@ def main():
     parser.add_argument("-v", "--verbose", help="Echo test result to console", action="store_true")
     parser.add_argument("-f", "--framework", help="Framework branch to use (Overrides testfile)")
     parser.add_argument("-m", "--module", help="Module to use")
+    parser.add_argument("-t", "--targetName", help="Target CPE/OS/NAME to use (Overrides testfile)")
     parser.add_argument("-p", "--payload", help="Meterpreter payload to use")
     parser.add_argument("-po", "--payloadoptions", help="Comma delineated venom-style settings for the given payload: attribute=x,attribute2=y...")
     parser.add_argument("testfile", help="json test file to use")
@@ -21,6 +22,12 @@ def main():
     """
     configData['TARGETS'] = apt_shared.convertAbstractTargets(configData['TARGETS'], configData['CREDS_FILE'], configData['LOG_FILE'])
     configData['MSF_HOSTS'] = apt_shared.confirmMsfHosts(configData['MSF_HOSTS'], configData['CREDS_FILE'], configData['LOG_FILE'])
+    if type(configData['TARGETS']) == bool:
+        print("NO TARGETS FOUND IN CATALOG")
+        exit(999)
+    if type(configData['MSF_HOSTS']) == bool:
+        print("NO MSF_HOSTS FOUND IN CATALOG")
+        exit(999)
 
     """
     IF GLOBAL PAYLOADS OR MODULES ARE LISTED, FILTER THEM AS BEST WE CAN AND ADD THEM TO EACH TARGET

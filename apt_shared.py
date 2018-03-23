@@ -314,7 +314,7 @@ def generateBranchScript(branchString, logFile):
             logMsg(logFile, "NONSTANDARD FRAMEWORK USERNAME: " + userName)
             repoName = branchData[1]
             logMsg(logFile, "NONSTANDARD FRAMEWORK REPO NAME: " + repoName)
-            branchName = branchData[2]
+            branchName = '/'.join(branchData[2:])
             logMsg(logFile, "NONSTANDARD FRAMEWORK BRANCH NAME: " + branchName)
             gitSyntax = "https://github.com/" + userName + "/" + repoName + ".git"
             gitScript = gitScript + "git remote add " + userName + " " + gitSyntax + "\n"

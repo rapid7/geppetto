@@ -519,7 +519,7 @@ def makeHtmlReport(targetData, msfHosts):
     htmlString = "<html>\n<head>\n<title>\n\tTEST RESULTS\n</title>\n</head>\n\n<body>\n"
     htmlString = htmlString + "<table border=\"1\">\n<tr><td>MSF_HOST NAME</td><td>MSF_HOST IP</td><td>MSF COMMIT VERSION</td><td>PCAP</td></tr>\n"
     for msfHost in msfHosts:
-        pcapLink = "<a href=" + msfHost['LOCAL_PCAP'] + ">PCAP FILE</a>"
+        pcapLink = "<a href=" + msfHost['LOCAL_PCAP'].replace(msfHost['TEST_DIR'], "..", 1) + ">PCAP FILE</a>"
         htmlString = htmlString + "<tr><td>" + msfHost['NAME'] + "</td><td>" + msfHost['IP_ADDRESS'] + "</td><td>" + msfHost['COMMIT_VERSION'] + "</td><td>" + pcapLink + "</td></tr>\n"
     htmlString = htmlString + "</table>\n"
     htmlString = htmlString + "<table border=\"1\">\n<tr><td>TARGET</td><td>TYPE</td><td>MSF_HOST</td><td>MODULE</td><td>PAYLOAD</td><td>STATUS</td><td>SESSION</td></tr>\n"
@@ -550,7 +550,9 @@ def makeHtmlReport(targetData, msfHosts):
                     htmlString = htmlString + failedString + "\n"
             else:
                 htmlString = htmlString + "<td> NO STATUS LISTED?</td>\n"
-            htmlString = htmlString + "<td><a href=" + sessionData['LOCAL_SESSION_FILE'] + ">SESSION CONTENT</a></td></tr>\n"
+            htmlString = htmlString + "<td><a href=" + \
+                         sessionData['LOCAL_SESSION_FILE'].replace(sessionData['TEST_DIR'], "..", 1) + \
+                         ">SESSION CONTENT</a></td></tr>\n"
 
     htmlString = htmlString + "</table>\n</body>\n</html>\n"
     return htmlString
@@ -1048,6 +1050,7 @@ def pullMsfLogs(testConfig):
         msfHost['VM_OBJECT'].runCmdOnGuest(['/usr/bin/killall', 'tcpdump'])
         srcFile = msfHost['PCAP_FILE']
         dstFile = testConfig['REPORT_DIR'] + "/" + msfHost['NAME'] + ".pcap"
+        msfHost['TEST_DIR'] = testConfig['TEST_DIR']
         msfHost['LOCAL_PCAP'] = dstFile
         msfHost['VM_OBJECT'].getFileFromGuest(srcFile, dstFile)
         srcFile = msfHost['COMMIT_FILE']
@@ -1078,6 +1081,7 @@ def pullTargetLogs(testConfig):
             logMsg(testConfig['LOG_FILE'], "SESSION_DIR = " + testConfig['SESSION_DIR'])
             logMsg(testConfig['LOG_FILE'], "RC_OUT_SCRIPT_NAME = " + str(sessionData['RC_OUT_SCRIPT_NAME'].split('/')[-1]))
             localFileName = testConfig['SESSION_DIR'] + '/' + str(sessionData['RC_OUT_SCRIPT_NAME'].split('/')[-1])
+            sessionData['TEST_DIR'] = testConfig['TEST_DIR']
             sessionData['LOCAL_SESSION_FILE'] = localFileName
             logMsg(testConfig['LOG_FILE'], "SAVING " + target['NAME'] + ":" + remoteFileName + " AS " + localFileName)
             if not sessionData['MSF_HOST']['VM_OBJECT'].getFileFromGuest(remoteFileName, localFileName):

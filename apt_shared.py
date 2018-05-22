@@ -1344,7 +1344,15 @@ def setupSessionData(testConfig):
 def setVmIPs(testConfig):
     for host in testConfig['MSF_HOSTS'] + testConfig['TARGETS']:
         if host['TYPE'].upper() == 'VIRTUAL' and 'IP_ADDRESS' not in host and 'VM_OBJECT' in host:
-            host['IP_ADDRESS'] = host['VM_OBJECT'].getVmIp()
+            interfaces = host['VM_OBJECT'].getVmInterfaces()
+            for nic in interfaces:
+                mac, IPs, network = nic
+                for addr in IPs:
+                    ip, mask = addr.split("/")
+                    if __isIPv4(ip):
+                        host['IP_ADDRESS'] = ip
+                    else:
+                        host['IPV6_ADDRESS'] = ip
         if 'IP_ADDRESS' not in host:
             return False
     return True
@@ -1565,6 +1573,10 @@ def waitForVms(vmList):
             return False
     return True
 
+def __isIPv4(addr):
+    if addr.count('.') == 3:
+        return all(0<=int(num)<256 for num in addr.rstrip().split('.'))
+    return False
 
 def __matchListToCatalog(vm_List, catalog_file, logFile="default.log"):
     my_catalog = SystemCatalog(catalog_file)

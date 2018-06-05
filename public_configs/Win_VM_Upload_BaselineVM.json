@@ -131,7 +131,7 @@
 			"PAYLOAD_DIRECTORY":	"C:\\payload_test",
 			"PYTHON":		"C:\\tools\\python\\python.exe",
 			"METERPRETER_PYTHON":	"C:\\tools\\python\\python.exe",
-			"METERPRETER_JAVA":	"C:\\Program Files\\Java\\jre1.8.0_151\\java.exe",
+			"METERPRETER_JAVA":	"java.exe",
 			"TESTING_SNAPSHOT":	"EnableAutoLogin"
 	},	
 

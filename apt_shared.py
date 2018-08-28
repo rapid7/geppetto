@@ -605,58 +605,61 @@ def makeRcScript(cmdList, targetData, sessionData, logFile, portNum):
                     "# TARGET:   " + targetData['NAME'] + ' [' + targetData['IP_ADDRESS'] +"]\n" + \
                     "# MSF HOST: " + sessionData['MSF_HOST']['IP_ADDRESS'] + "\n"
     rcScriptName = sessionData['RC_IN_SCRIPT_NAME']
-    rubySleep = "echo '<ruby>' >> " + rcScriptName + '\n'
-    rubySleep = rubySleep + "echo '    sleep(2)' >> " + rcScriptName + '\n'
-    rubySleep = rubySleep + "echo '</ruby>' >> " + rcScriptName + '\n'
-    rcScriptContent = rcScriptContent + "echo 'use " + sessionData['MODULE']['NAME'] + " ' > " + rcScriptName + "\n"
+    rubySleep = "<ruby>\n"
+    rubySleep += "    sleep(2)\n"
+    rubySleep += "</ruby>\n"
+    rcScriptContent += "cat > " + rcScriptName + " <<EOFRC\n"
+    rcScriptContent += "use " + sessionData['MODULE']['NAME'] + '\n'
     if sessionData['MODULE']['NAME'] != 'exploit/multi/handler':
         # THIS IS TERRIBLE, AND I WISH WE DID NOT HAVE TO DO THIS MAYBE ONLY FOR AUX LATER?
-        rcScriptContent = rcScriptContent + "echo 'set RHOST " + targetData['IP_ADDRESS'] + " ' >> " + rcScriptName + "\n"
-        rcScriptContent = rcScriptContent + "echo 'set RHOSTS " + targetData['IP_ADDRESS'] + " ' >> " + rcScriptName + "\n"
+        rcScriptContent += "set RHOST " + targetData['IP_ADDRESS'] + '\n'
+        rcScriptContent += "set RHOSTS " + targetData['IP_ADDRESS'] + '\n'
     for settingItem in sessionData['MODULE']['SETTINGS']:
         processedString = replaceWildcards(settingItem, targetData, sessionData, portNum)
         if '=' in processedString:
-            rcScriptContent = rcScriptContent + "echo 'set " + processedString.split('=')[0] + ' ' + processedString.split('=')[1] + "' >> " + rcScriptName + '\n'
+            rcScriptContent += "set " + processedString.split('=')[0] + ' ' + processedString.split('=')[1] + '\n'
     if 'PAYLOAD' in sessionData:
-        rcScriptContent = rcScriptContent + "echo 'set payload " + sessionData['PAYLOAD']['NAME'] +"' >> " + rcScriptName + '\n'
+        rcScriptContent += "set payload " + sessionData['PAYLOAD']['NAME'] + '\n'
         for settingItem in sessionData['PAYLOAD']['SETTINGS']:
-            rcScriptContent = rcScriptContent + "echo 'set " + settingItem.split('=')[0] + ' ' + settingItem.split('=')[1] + "' >> " + rcScriptName + '\n'
+            rcScriptContent += "set " + settingItem.split('=')[0] + ' ' + settingItem.split('=')[1] + '\n'
         if 'bind' in sessionData['PAYLOAD']['NAME']:
-            rcScriptContent = rcScriptContent + "echo 'set RHOST " + targetData['IP_ADDRESS'] + "' >> " + rcScriptName + '\n'
-            rcScriptContent = rcScriptContent + "echo 'set LPORT " + str(sessionData['PAYLOAD']['PRIMARY_PORT']) + "' >> " + rcScriptName + '\n'
+            rcScriptContent += "set RHOST " + targetData['IP_ADDRESS'] + '\n'
+            rcScriptContent += "set LPORT " + str(sessionData['PAYLOAD']['PRIMARY_PORT']) + '\n'
         if 'reverse' in sessionData['PAYLOAD']['NAME']:
-            rcScriptContent = rcScriptContent + "echo 'set LHOST " + sessionData['MSF_HOST']['IP_ADDRESS'] + "' >> " + rcScriptName + '\n'
-            rcScriptContent = rcScriptContent + "echo 'set LPORT " + str(sessionData['PAYLOAD']['PRIMARY_PORT']) + "' >> " + rcScriptName + '\n'
-        rcScriptContent = rcScriptContent + "echo 'show options' >> " + rcScriptName + '\n'
-        rcScriptContent = rcScriptContent + rubySleep
+            rcScriptContent += sessionData['MSF_HOST']['IP_ADDRESS'] + '\n'
+            rcScriptContent += "set LPORT " + str(sessionData['PAYLOAD']['PRIMARY_PORT']) + '\n'
+        rcScriptContent += "show options\n"
+        rcScriptContent += rubySleep
         if sessionData['MODULE']['NAME'] != 'exploit/multi/handler':
-            rcScriptContent = rcScriptContent + "echo 'check' >> " + rcScriptName + '\n'
-        rcScriptContent = rcScriptContent + "echo 'run -z' >> " + rcScriptName + '\n'
-        rcScriptContent = rcScriptContent + "echo '<ruby>' >> " + rcScriptName + '\n'
-        rcScriptContent = rcScriptContent + "echo '    while framework.sessions.count == 0 do '>> " + rcScriptName + '\n'
-        rcScriptContent = rcScriptContent + "echo '        sleep(1)' >> " + rcScriptName + '\n'
-        rcScriptContent = rcScriptContent + "echo '    end' >> " + rcScriptName + '\n'
-        rcScriptContent = rcScriptContent + "echo '    sleep(30)' >> " + rcScriptName + '\n'
-        rcScriptContent = rcScriptContent + "echo '</ruby>' >> " + rcScriptName + '\n'
+            rcScriptContent += 'check\n'
+        rcScriptContent += 'run -z\n'
+        rcScriptContent += '<ruby>\n'
+        rcScriptContent += '    while framework.sessions.count == 0 do\n'
+        rcScriptContent += '        sleep(1)\n'
+        rcScriptContent += '    end\n'
+        rcScriptContent += '    sleep(30)\n'
+        rcScriptContent += '</ruby>\n'
     else:
-        rcScriptContent = rcScriptContent + "echo 'show options' >> " + rcScriptName + '\n'
-        rcScriptContent = rcScriptContent + rubySleep
-        rcScriptContent = rcScriptContent + "echo 'run -z' >> " + rcScriptName + '\n'
-        rcScriptContent = rcScriptContent + "echo '<ruby>' >> " + rcScriptName + '\n'
-        rcScriptContent = rcScriptContent + "echo '  sleep(10)' >> " + rcScriptName + '\n'
-        rcScriptContent = rcScriptContent + "echo '</ruby>' >> " + rcScriptName + '\n'
+        rcScriptContent += 'show options\n'
+        rcScriptContent += rubySleep
+        rcScriptContent += 'run -z\n'
+        rcScriptContent += '<ruby>\n'
+        rcScriptContent += '  sleep(10)\n'
+        rcScriptContent += '</ruby>\n'
         
     addSleep = True
     for cmd in cmdList:
         processedCmd = replaceWildcards(cmd, targetData, sessionData, portNum)
-        rcScriptContent = rcScriptContent + "echo '" + processedCmd + "' >> " + rcScriptName + '\n'
+        rcScriptContent += processedCmd + '\n'
         if "<ruby>" in processedCmd.lower():
             addSleep = False
         if "</ruby>" in processedCmd.lower():
             addSleep = True
         if addSleep:
-            rcScriptContent = rcScriptContent + rubySleep
-    rcScriptContent = rcScriptContent + "echo 'exit -y' >> " + rcScriptName + '\n'
+            rcScriptContent += rubySleep
+    rcScriptContent += 'exit -y\n'
+    rcScriptContent += 'EOFRC\n'
+
     return rcScriptContent    
 
 

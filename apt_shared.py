@@ -626,7 +626,7 @@ def makeRcScript(cmdList, targetData, sessionData, logFile, portNum):
             rcScriptContent += "set RHOST " + targetData['IP_ADDRESS'] + '\n'
             rcScriptContent += "set LPORT " + str(sessionData['PAYLOAD']['PRIMARY_PORT']) + '\n'
         if 'reverse' in sessionData['PAYLOAD']['NAME']:
-            rcScriptContent += sessionData['MSF_HOST']['IP_ADDRESS'] + '\n'
+            rcScriptContent += "set LHOST " + sessionData['MSF_HOST']['IP_ADDRESS'] + '\n'
             rcScriptContent += "set LPORT " + str(sessionData['PAYLOAD']['PRIMARY_PORT']) + '\n'
         rcScriptContent += "show options\n"
         rcScriptContent += rubySleep

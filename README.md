@@ -1,6 +1,10 @@
-# payload-testing
+# Geppetto
+
+## About
+Geppetto is an infrastructure automation tools used to orchestrate the state of virtual machines for testing deployed binary files in a repeatable way. While the original intended use case is specific to the [Metasploit Framework Project](https://metasploit.com) for use in testing deliverable payloads against virtual machines and physical hardware, the resulting tool has been able to play puppeteer for multiple scenarios.
+
 ## Purpose
-The idea behind this repo is to create an automated testing framework that can test metasploit payloads and exploits against actual targets.  It takes in json config files containing target data, exploit data, and payload data, then creates bash and/or python configuration scripts for the hists and rc scripts for msfconsole sessions that it uploads and runs on host machines as-needed.  This repo was creaded originally with the expectation it would use a sister repo, vm-automation, but with increasing functinoality, the requirement that targets be virtualized is gone, and hopefully future improvements will allow the msfconsole sessions to run on physical hardware as well.
+The idea behind this project is to create an automated testing framework that can test metasploit payloads and exploits against actual targets.  It takes in json config files containing target data, exploit data, and payload data, then creates bash and/or python configuration scripts for the hists and rc scripts for msfconsole sessions that it uploads and runs on host machines as-needed.  This project was created originally with the expectation it would use a sister project, [vm-automation](https://github.com/rapdi7/vm-automation), but with increasing functionality, the requirement that targets be virtualized is gone, and hopefully future improvements will allow the msfconsole sessions to run on physical hardware as well.
 
 ### How does it work?
 Originally, this script was targeted to virtual machines and exclusively for reverse `/exploit/multi/handler` "exploits" so that's a good place to start the explination:

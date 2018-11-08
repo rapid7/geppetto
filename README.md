@@ -138,10 +138,10 @@ Within that directory, there will be three directories:
 
 ## Executing tests with Docker
 ```
-cd payload-testing/docker
-docker build -t rapid7/build:payload-testing .
+cd geppetto/docker
+docker build -t rapid7/build:geppetto .
 docker run --rm=true --tty -u jenkins \
     --volume=${PATH_TO_WORKING_DIR}:/r7-source \
-    --workdir=/r7-source/payload-testing rapid7/build:payload-testing \
+    --workdir=/r7-source/geppetto rapid7/build:geppetto \
     bash -l -c "python autoPayloadTest.py ${DOCKER_RELATIVE_PATH_TO_TEST_JSON}"
 ```

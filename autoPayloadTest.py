@@ -5,7 +5,10 @@ import time
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("-tf", "--targetFile", help="Override target section")
+    parser.add_argument("-mh", "--msfHostsFile", help="Override MSF_HOSTS section")
     parser.add_argument("-v", "--verbose", help="Echo test result to console", action="store_true")
+    parser.add_argument("-vf", "--verboseFilename", help="Echo report filename to console", action="store_true")
     parser.add_argument("-f", "--framework", help="Framework branch to use (Overrides testfile)")
     parser.add_argument("-m", "--module", help="Module to use")
     parser.add_argument("-t", "--targetName", help="Target CPE/OS/NAME to use (Overrides testfile)")

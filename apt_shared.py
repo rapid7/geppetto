@@ -797,7 +797,15 @@ def prepConfig(args):
     if None == configData:
         logMsg(logFile, "THERE WAS A PROBLEM WITH THE TEST JSON CONFIG FILE")
         exit(999)
-        
+    if args.targetFile != None:
+        configData['TARGETS'] = parseTestConfig(args.targetFile)
+    if 'TARGET_FILE' in configData['TARGETS']:
+        configData['TARGETS'] = parseTestConfig(configData['TARGETS']['TARGET_FILE'])['MSF_HOSTS'].copy()
+    if args.msfHostsFile != None:
+        configData['MSF_HOSTS'] = parseTestConfig(args.msfHostsFile)['MSF_HOSTS']
+        print(str(configData['MSF_HOSTS']))
+    if 'MSF_HOST_FILE' in configData['MSF_HOSTS']:
+        configData['MSF_HOSTS'] = parseTestConfig(configData['MSF_HOSTS']['MSF_HOST_FILE'])
     if args.targetName != None:
         logMsg(logFile, "REPLACING ALL TARGETS WITH SINGLE TARGET " + str(args.targetName))
         newTargets = []
@@ -808,15 +816,13 @@ def prepConfig(args):
         mergedTarget.update(targetOverride)
         newTargets.append(mergedTarget)
         configData['TARGETS'] = newTargets
-
     if args.framework != None:
         configData['FRAMEWORK_BRANCH'] = args.framework
-
     if args.payload != None:
         payloadDic = {}
         payloadDic['NAME'] = args.payload
-        if args.payloadoptions != None:
-            payloadDic['SETTINGS'] = args.payloadoptions.split(',')
+        if args.payloadOptions != None:
+            payloadDic['SETTINGS'] = args.payloadOptions.split(',')
         else:
             payloadDic['SETTINGS'] = []
         if 'PAYLOADS' in configData:
@@ -825,7 +831,6 @@ def prepConfig(args):
             configData['PAYLOADS'] = [payloadDic.copy()]
         if (args.module == None) and ('MODULES' not in configData):
             args.module = "exploit/multi/handler"
-
     if args.module != None:
         moduleDic = {}
         moduleDic['NAME'] = args.module
@@ -1585,22 +1590,25 @@ def __matchListToCatalog(vm_List, catalog_file, logFile="default.log"):
     my_catalog = SystemCatalog(catalog_file)
     defined_vms = []
     for vm in vm_List:
-        if 'CPE' in vm:
-            local_target = my_catalog.findByCPE(vm['CPE'])
-        elif 'OS' in vm:
-            local_target = my_catalog.findByOS(vm['OS'])
-        else:
-            local_target = my_catalog.findByName(vm['NAME'])
-        if local_target is not None:
-            final_vm = vm.copy()
-            final_vm.update(local_target)
-        else:
+        if vm['TYPE'] == 'PHYSICAL':
             final_vm = vm
-        if "USERNAME" not in final_vm:
-            logMsg(logFile, "NO USERNAME FOR " + str(vm))
-            return False
-        if "PASSWORD" not in final_vm:
-            logMsg(logFile, "NO PASSWORD FOR " + str(vm))
-            return False
-        defined_vms.append(final_vm)
+        else:
+            if 'CPE' in vm:
+                local_target = my_catalog.findByCPE(vm['CPE'])
+            elif 'OS' in vm:
+                local_target = my_catalog.findByOS(vm['OS'])
+            else:
+                local_target = my_catalog.findByName(vm['NAME'])
+            if local_target is not None:
+                final_vm = vm.copy()
+                final_vm.update(local_target)
+            else:
+                final_vm = vm
+            if "USERNAME" not in final_vm:
+                logMsg(logFile, "NO USERNAME FOR " + str(vm))
+                return False
+            if "PASSWORD" not in final_vm:
+                logMsg(logFile, "NO PASSWORD FOR " + str(vm))
+                return False
+            defined_vms.append(final_vm)
     return defined_vms

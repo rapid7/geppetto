@@ -106,6 +106,8 @@ def main():
     """
     apt_shared.logMsg(configData['LOG_FILE'], "WAITING FOR ALL TASKS TO COMPLETE")
     time.sleep(5)
+    if args.verboseFilename:
+        print("REPORT_LOCATION: " + configData['REPORT_DIR'] + "/" + configData['REPORT_PREFIX'] + ".html")
     if testResult:
         apt_shared.logMsg(configData['LOG_FILE'], "TEST SUCCEEDED")
         if args.verbose:

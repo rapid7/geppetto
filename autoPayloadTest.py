@@ -5,12 +5,15 @@ import time
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("-tf", "--targetFile", help="Override target section")
+    parser.add_argument("-mh", "--msfHostsFile", help="Override MSF_HOSTS section")
     parser.add_argument("-v", "--verbose", help="Echo test result to console", action="store_true")
+    parser.add_argument("-vf", "--verboseFilename", help="Echo report filename to console", action="store_true")
     parser.add_argument("-f", "--framework", help="Framework branch to use (Overrides testfile)")
     parser.add_argument("-m", "--module", help="Module to use")
     parser.add_argument("-t", "--targetName", help="Target CPE/OS/NAME to use (Overrides testfile)")
     parser.add_argument("-p", "--payload", help="Meterpreter payload to use")
-    parser.add_argument("-po", "--payloadoptions", help="Comma delineated venom-style settings for the given payload: attribute=x,attribute2=y...")
+    parser.add_argument("-po", "--payloadOptions", help="Comma delineated venom-style settings for the given payload: attribute=x,attribute2=y...")
     parser.add_argument("testfile", help="json test file to use")
     args = parser.parse_args()
 
@@ -103,6 +106,8 @@ def main():
     """
     apt_shared.logMsg(configData['LOG_FILE'], "WAITING FOR ALL TASKS TO COMPLETE")
     time.sleep(5)
+    if args.verboseFilename:
+        print("REPORT_LOCATION: " + configData['REPORT_DIR'] + "/" + configData['REPORT_PREFIX'] + ".html")
     if testResult:
         apt_shared.logMsg(configData['LOG_FILE'], "TEST SUCCEEDED")
         if args.verbose:

@@ -252,8 +252,8 @@ def checkStagesNeeded(targetData):
         for sessionData in targetData['SESSION_DATASETS']:
             if 'PAYLOAD' in sessionData:
                 stageTwoNeeded = True
-            if 'bind' in sessionData['PAYLOAD']['NAME']:
-                stageThreeNeeded = True
+                if 'bind' in sessionData['PAYLOAD']['NAME']:
+                    stageThreeNeeded = True
     return (stageTwoNeeded, stageThreeNeeded)
 
 

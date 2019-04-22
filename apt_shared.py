@@ -97,9 +97,10 @@ def checkData(testConfig):
                         statusFlag = False
             if 'FAILURE_LIST' in target:
                 for item in target['FAILURE_LIST']:
-                    if item in fileContents:
-                        logMsg(testConfig['LOG_FILE'], str(item))
-                        statusFlag = False
+                    for line in fileContents.split():
+                        if item in line:
+                            logMsg(testConfig['LOG_FILE'], str(line))
+                            statusFlag = False
             sessionData['STATUS'] = statusFlag
             if statusFlag:
                 logMsg(testConfig['LOG_FILE'], sessionData['LOCAL_SESSION_FILE'])

@@ -97,7 +97,7 @@ def checkData(testConfig):
                         statusFlag = False
             if 'FAILURE_LIST' in target:
                 for item in target['FAILURE_LIST']:
-                    for line in fileContents.split():
+                    for line in fileContents.splitlines():
                         if item in line:
                             logMsg(testConfig['LOG_FILE'], str(line))
                             statusFlag = False

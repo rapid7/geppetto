@@ -75,6 +75,7 @@ def main():
     """
     apt_shared.expandGlobalList(configData['TARGETS'], configData['COMMAND_LIST'], "COMMAND_LIST")
     apt_shared.expandGlobalList(configData['TARGETS'], configData['SUCCESS_LIST'], "SUCCESS_LIST")
+    apt_shared.expandGlobalList(configData['TARGETS'], configData['FAILURE_LIST'], "FAILURE_LIST")
             
     
     # DEBUG PRINT

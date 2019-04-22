@@ -90,10 +90,16 @@ def checkData(testConfig):
             except IOError as e:
                 logMsg(testConfig['LOG_FILE'], "FAILED TO OPEN LOCAL REPORT FILE: " + sessionData['LOCAL_SESSION_FILE'])
                 continue
-            for item in target['SUCCESS_LIST']:
-                if item not in fileContents:
-                    logMsg(testConfig['LOG_FILE'], str(item))
-                    statusFlag = False
+            if 'SUCCESS_LIST' in target:
+                for item in target['SUCCESS_LIST']:
+                    if item not in fileContents:
+                        logMsg(testConfig['LOG_FILE'], str(item))
+                        statusFlag = False
+            if 'FAILURE_LIST' in target:
+                for item in target['FAILURE_LIST']:
+                    if item in fileContents:
+                        logMsg(testConfig['LOG_FILE'], str(item))
+                        statusFlag = False
             sessionData['STATUS'] = statusFlag
             if statusFlag:
                 logMsg(testConfig['LOG_FILE'], sessionData['LOCAL_SESSION_FILE'])
@@ -1385,7 +1391,6 @@ def verifyConfig(jsonDic):
     requiredList.append("STARTING_LISTENER")
     requiredList.append("MSF_HOSTS")
     requiredList.append("TARGETS")
-    requiredList.append("SUCCESS_LIST")
     for item in requiredList:
         if item not in jsonDic:
             print("MISSING " + item + " IN CONFIGURATION FILE\n")

@@ -833,7 +833,7 @@ def prepConfig(args):
         configData['TARGETS'] = newTargets
     if args.skipSnapshotting:
         configData['SKIP_SNAPSHOTTING'] = "true"
-    else:
+    if 'SKIP_SNAPSHOTTING' not in configData:
         configData['SKIP_SNAPSHOTTING'] = "false"
     if args.framework != None:
         configData['FRAMEWORK_BRANCH'] = args.framework

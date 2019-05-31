@@ -11,9 +11,10 @@ def main():
     parser.add_argument("-vf", "--verboseFilename", help="Echo report filename to console", action="store_true")
     parser.add_argument("-f", "--framework", help="Framework branch to use (Overrides testfile)")
     parser.add_argument("-m", "--module", help="Module to use")
-    parser.add_argument("-t", "--targetName", help="Target CPE/OS/NAME to use (Overrides testfile)")
     parser.add_argument("-p", "--payload", help="Meterpreter payload to use")
     parser.add_argument("-po", "--payloadOptions", help="Comma delineated venom-style settings for the given payload: attribute=x,attribute2=y...")
+    parser.add_argument("-ss", "--skipSnapshotting", help="Skip intial snapshot and restore (trashes current VM state and leaves VMs on)", action="store_true")
+    parser.add_argument("-t", "--targetName", help="Target CPE/OS/NAME to use (Overrides testfile)")
     parser.add_argument("testfile", help="json test file to use")
     args = parser.parse_args()
 
@@ -99,10 +100,14 @@ def main():
     """
     RETURN VMS TO SNAPSHOTS
     """
-    if apt_shared.resetVms(configData):
-        apt_shared.logMsg(configData['LOG_FILE'], "SUCCESSFULLY RESET VMS")
-    else:
-        apt_shared.logMsg(configData['LOG_FILE'], "THERE WAS A PROBLEM RESETTING VMS")
+    if 'SKIP_SNAPSHOTTING' in configData:
+        apt_shared.logMsg(configData['LOG_FILE'], "SKIP_SNAPSHOTTING IN configData")
+        apt_shared.logMsg(configData['LOG_FILE'], "configData['SKIP_SNAPSHOTTING'] = " + str(configData['SKIP_SNAPSHOTTING']))
+    if 'SKIP_SNAPSHOTTING' in configData and configData['SKIP_SNAPSHOTTING'].upper() != "TRUE":
+        if apt_shared.resetVms(configData):
+            apt_shared.logMsg(configData['LOG_FILE'], "SUCCESSFULLY RESET VMS")
+        else:
+            apt_shared.logMsg(configData['LOG_FILE'], "THERE WAS A PROBLEM RESETTING VMS")
     
     """
     WAIT A COUPLE SECONDS TO MAKE SURE WVERYTHING COMPLETES, THEN RETURN THE PROPER VALUE

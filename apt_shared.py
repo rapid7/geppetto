@@ -831,6 +831,10 @@ def prepConfig(args):
         mergedTarget.update(targetOverride)
         newTargets.append(mergedTarget)
         configData['TARGETS'] = newTargets
+    if args.skipSnapshotting:
+        configData['SKIP_SNAPSHOTTING'] = True
+    if 'SKIP_SNAPSHOTTING' not in configData:
+        configData['SKIP_SNAPSHOTTING'] = False
     if args.framework != None:
         configData['FRAMEWORK_BRANCH'] = args.framework
     if args.payload != None:
@@ -1052,9 +1056,10 @@ def prepTestVms(testConfig):
     testVms = []
     for host in testConfig['TARGETS'] + testConfig['MSF_HOSTS']:
         if host['TYPE'] == "VIRTUAL":
-            host['TEMP_SNAPSHOT'] = 'PAYLOAD_TESTING_'+testConfig['TIMESTAMP']
-            if not host['VM_OBJECT'].takeSnapshot(host['TEMP_SNAPSHOT']):
-                logMsg(testConfig['LOG_FILE'], "FAILED TO CREATE SNAPSHOT ON " + host['NAME'])
+            if 'SKIP_SNAPSHOTTING' not in testConfig or testConfig['SKIP_SNAPSHOTTING'] == False:
+                host['TEMP_SNAPSHOT'] = 'PAYLOAD_TESTING_'+testConfig['TIMESTAMP']
+                if not host['VM_OBJECT'].takeSnapshot(host['TEMP_SNAPSHOT']):
+                    logMsg(testConfig['LOG_FILE'], "FAILED TO CREATE SNAPSHOT ON " + host['NAME'])
             if 'TESTING_SNAPSHOT' in host:
                 logMsg(testConfig['LOG_FILE'], "TRYING TO REVERT " + host['NAME'] + " TO " + host['TESTING_SNAPSHOT'])
                 host['VM_OBJECT'].revertToSnapshotByName(host['TESTING_SNAPSHOT'])

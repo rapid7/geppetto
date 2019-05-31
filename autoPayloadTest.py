@@ -103,7 +103,7 @@ def main():
     if 'SKIP_SNAPSHOTTING' in configData:
         apt_shared.logMsg(configData['LOG_FILE'], "SKIP_SNAPSHOTTING IN configData")
         apt_shared.logMsg(configData['LOG_FILE'], "configData['SKIP_SNAPSHOTTING'] = " + str(configData['SKIP_SNAPSHOTTING']))
-    if 'SKIP_SNAPSHOTTING' in configData and configData['SKIP_SNAPSHOTTING'].upper() != "TRUE":
+    if 'SKIP_SNAPSHOTTING' in configData and configData['SKIP_SNAPSHOTTING'] == False:
         if apt_shared.resetVms(configData):
             apt_shared.logMsg(configData['LOG_FILE'], "SUCCESSFULLY RESET VMS")
         else:

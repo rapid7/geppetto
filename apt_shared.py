@@ -832,9 +832,9 @@ def prepConfig(args):
         newTargets.append(mergedTarget)
         configData['TARGETS'] = newTargets
     if args.skipSnapshotting:
-        configData['SKIP_SNAPSHOTTING'] = "true"
+        configData['SKIP_SNAPSHOTTING'] = True
     if 'SKIP_SNAPSHOTTING' not in configData:
-        configData['SKIP_SNAPSHOTTING'] = "false"
+        configData['SKIP_SNAPSHOTTING'] = False
     if args.framework != None:
         configData['FRAMEWORK_BRANCH'] = args.framework
     if args.payload != None:
@@ -1056,7 +1056,7 @@ def prepTestVms(testConfig):
     testVms = []
     for host in testConfig['TARGETS'] + testConfig['MSF_HOSTS']:
         if host['TYPE'] == "VIRTUAL":
-            if 'SKIP_SNAPSHOTTING' not in testConfig or testConfig['SKIP_SNAPSHOTTING'].upper() == "FALSE":
+            if 'SKIP_SNAPSHOTTING' not in testConfig or testConfig['SKIP_SNAPSHOTTING'] == False:
                 host['TEMP_SNAPSHOT'] = 'PAYLOAD_TESTING_'+testConfig['TIMESTAMP']
                 if not host['VM_OBJECT'].takeSnapshot(host['TEMP_SNAPSHOT']):
                     logMsg(testConfig['LOG_FILE'], "FAILED TO CREATE SNAPSHOT ON " + host['NAME'])

@@ -16,13 +16,13 @@
 	"TARGETS":
 	[
 		{
+			"CPE":			"cpe:/o:fedoraproject:fedora:29::"
+		},
+		{
+			"CPE":			"cpe:/o:centos:centos:6::"
+		},
+		{
 			"CPE":			"cpe:/o:canonical:ubuntu_linux:16.04::"
-		},
-		{
-			"CPE":      "cpe:/o:fedoraproject:fedora:29::"
-		},
-		{
-			"CPE":			"cpe:/o:centos:centos:7::"
 		}
 	],
 	"TARGET_GLOBALS":
@@ -38,11 +38,11 @@
 	"PAYLOADS":
 	[
 		{
-			"NAME": "linux/x64/meterpreter_reverse_https",
+			"NAME": "linux/x64/meterpreter_reverse_tcp",
 			"SETTINGS": []
 		},
 		{
-			"NAME": "linux/x64/meterpreter_reverse_tcp",
+			"NAME": "linux/x64/meterpreter_reverse_https",
 			"SETTINGS": []
 		}
 	],

@@ -64,10 +64,14 @@ def main():
     for config in nightlyConfigs:
         if testFilename in config['test_config']:
             for payload in payloadList:
-                cmdString = "python autoPayloadTest.py -SS -p " + payload.strip() + " " + config['test_config']
-                cmdString = cmdString + frameworkOption
-                cmdString = cmdString + moduleOption
-                cmdString = cmdString + verboseOption
+                cmdString = "python autoPayloadTest.py -SS -p " + payload['name'].strip() + " " + config['test_config']
+                if len(payload['opts']) > 0:
+                    cmdString += " -po "
+                    for option in payload['opts']:
+                        cmdString += option + ","
+                cmdString += frameworkOption
+                cmdString += moduleOption
+                cmdString += verboseOption
                 cmdList.append(cmdString)
 
     failures = 0

@@ -10,5 +10,5 @@
   {"name": "windows/x64/meterpreter_bind_tcp", "opts": []},
   {"name": "windows/x64/meterpreter_reverse_http", "opts": []},
   {"name": "windows/x64/meterpreter_reverse_https", "opts": []},
-  {"name": "windows/x64/meterpreter_reverse_tcp", "opts": []},
+  {"name": "windows/x64/meterpreter_reverse_tcp", "opts": []}
 ]

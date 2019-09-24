@@ -1,4 +1,6 @@
-java/meterpreter/bind_tcp
-java/meterpreter/reverse_http
-java/meterpreter/reverse_https
-java/meterpreter/reverse_tcp
+[
+  {"name": "java/meterpreter/bind_tcp", "opts": []},
+  {"name": "java/meterpreter/reverse_http", "opts": []},
+  {"name": "java/meterpreter/reverse_https", "opts": []},
+  {"name": "java/meterpreter/reverse_tcp", "opts": []}
+]

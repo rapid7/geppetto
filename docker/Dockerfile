@@ -31,6 +31,7 @@ RUN su jenkins -c "/bin/bash -l -c 'pyenv install 2.7.13 && pyenv global 2.7.13'
 RUN su jenkins -c "/bin/bash -l -c 'pip install --upgrade cpe-utils'"
 RUN su jenkins -c "/bin/bash -l -c 'pip install --upgrade pyvmomi'"
 RUN su jenkins -c "/bin/bash -l -c 'pip install --upgrade vm-automation'"
+RUN su jenkins -c "/bin/bash -l -c 'pip install --upgrade tqdm'"
 
 VOLUME "$JENKINS_HOME"
 RUN chown -R jenkins "$JENKINS_HOME"

@@ -1,0 +1,14 @@
+[
+  {"name": "windows/x64/meterpreter/bind_tcp", "opts": []},
+  {"name": "windows/x64/meterpreter/bind_tcp_uuid", "opts": []},
+  {"name": "windows/x64/meterpreter/reverse_http", "opts": []},
+  {"name": "windows/x64/meterpreter/reverse_https", "opts": []},
+  {"name": "windows/x64/meterpreter/reverse_tcp", "opts": []},
+  {"name": "windows/x64/meterpreter/reverse_tcp_uuid", "opts": []},
+  {"name": "windows/x64/meterpreter/reverse_winhttp", "opts": []},
+  {"name": "windows/x64/meterpreter/reverse_winhttps", "opts": []},
+  {"name": "windows/x64/meterpreter_bind_tcp", "opts": []},
+  {"name": "windows/x64/meterpreter_reverse_http", "opts": []},
+  {"name": "windows/x64/meterpreter_reverse_https", "opts": []},
+  {"name": "windows/x64/meterpreter_reverse_tcp", "opts": []},
+]

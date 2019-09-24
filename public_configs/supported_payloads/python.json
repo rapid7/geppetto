@@ -1,0 +1,13 @@
+[
+  {"name": "python/meterpreter/bind_tcp", "opts":[]},
+  {"name": "python/meterpreter/bind_tcp_uuid", "opts":[]},
+  {"name": "python/meterpreter/reverse_http", "opts":[]},
+  {"name": "python/meterpreter/reverse_https", "opts":[]},
+  {"name": "python/meterpreter/reverse_tcp", "opts":[]},
+  {"name": "python/meterpreter/reverse_tcp_ssl", "opts":[]},
+  {"name": "python/meterpreter/reverse_tcp_uuid", "opts":[]},
+  {"name": "python/meterpreter_bind_tcp", "opts":[]},
+  {"name": "python/meterpreter_reverse_http", "opts":[]},
+  {"name": "python/meterpreter_reverse_https", "opts":[]},
+  {"name": "python/meterpreter_reverse_tcp", "opts":[]}
+]

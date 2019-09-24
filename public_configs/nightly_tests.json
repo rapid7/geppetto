@@ -1,39 +1,39 @@
 [
   {
-    "test_config": "../nightly_tests/Win_10x64_meterpreter_nightly.json",
+    "test_config": "./public_configs/nightly_tests/Win_10x64_meterpreter_nightly.json",
     "payload_files": 
       [
-  	    "../supported_payloads/Win_Exe_x86.txt",
-	    "../supported_payloads/Win_Exe_x64.txt"
+  	    "./public_configs/supported_payloads/Win_Exe_x86.txt",
+	    "./public_configs/supported_payloads/Win_Exe_x64.txt"
       ]
   },
   {
-    "test_config": "../nightly_tests/Win_10x86_meterpreter_nightly.json",
+    "test_config": "./public_configs/nightly_tests/Win_10x86_meterpreter_nightly.json",
     "payload_files": 
       [
-	    "../supported_payloads/Win_Exe_x86.txt"
+	    "./public_configs/supported_payloads/Win_Exe_x86.txt"
       ]
   },
   {
-    "test_config": "../nightly_tests/Win_7x64_8x64_meterpreter_nightly.json",
+    "test_config": "./public_configs/nightly_tests/Win_7x64_8x64_meterpreter_nightly.json",
     "payload_files": 
       [
-	    "../supported_payloads/Win_Exe_x64.txt",
-	    "../supported_payloads/Win_Exe_x86.txt"
+	    "./public_configs/supported_payloads/Win_Exe_x64.txt",
+	    "./public_configs/supported_payloads/Win_Exe_x86.txt"
       ]
   },
   {
-    "test_config": "../nightly_tests/Win_7x86_8x86_meterpreter_nightly.json",
+    "test_config": "./public_configs/nightly_tests/Win_7x86_8x86_meterpreter_nightly.json",
     "payload_files": 
       [
-	    "../supported_payloads/Win_Exe_x86.txt"
+	    "./public_configs/supported_payloads/Win_Exe_x86.txt"
       ]
   },
   {
-    "test_config": "../nightly_tests/Win_server_meterpreter_nightly.json",
+    "test_config": "./public_configs/nightly_tests/Win_server_meterpreter_nightly.json",
     "payload_files": 
       [
-	    "../supported_payloads/Win_Exe_x64.txt"
+	    "./public_configs/supported_payloads/Win_Exe_x64.txt"
       ]
   }
 ]

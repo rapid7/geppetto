@@ -1,0 +1,85 @@
+{
+	"HTTP_PORT":			5309,
+	"STARTING_LISTENER":		30000,
+	"CREDS_FILE":			"../JSON/creds.json",
+	"MSF_HOSTS":
+	[
+		{
+			"TYPE":			"VIRTUAL",
+			"METHOD":		"VM_TOOLS_UPLOAD",
+			"HYPERVISOR_CONFIG":	"../JSON/esxi_config.json",
+			"CPE":			"cpe:/a:rapid7:metasploit:::",
+			"MSF_PATH":		"/home/msfuser/rapid7/metasploit-framework",
+			"MSF_ARTIFACT_PATH":	"/home/msfuser/rapid7/test_artifacts"
+		}
+	],
+	"TARGETS":
+	[
+		{
+                        "CPE": "cpe:/o:microsoft:windows_10:::x64"
+		}
+	],
+	"TARGET_GLOBALS":
+	{
+			"TYPE":			"VIRTUAL",
+			"HYPERVISOR_CONFIG":	"../JSON/esxi_config.json",
+			"METHOD":		"VM_TOOLS_UPLOAD",
+			"PAYLOAD_DIRECTORY":	"C:\\payload_test",
+			"PYTHON":		"C:\\tools\\python\\python.exe",
+			"METERPRETER_PYTHON":	"C:\\tools\\python\\python.exe",
+			"METERPRETER_JAVA":	"C:\\Program Files\\Java\\jre1.8.0_151\\java.exe"
+	},	
+	"MODULES":	
+	[
+		{
+			"NAME":		"exploit/multi/handler",
+			"SETTINGS":	[]
+		}
+	],
+	"COMMAND_LIST": [
+		"sessions -C sysinfo",
+		"sessions -C ifconfig",
+		"sessions -C sessions -l",
+		"sessions -C getuid",
+		"loadpath test/modules",
+		"use post/test/cmd_exec",
+		"set verbose true",
+		"set session 1",
+		"run",
+		"use post/test/file",
+		"set verbose true",
+		"set session 1",
+		"run",
+		"use post/test/get_env",
+		"set verbose true",
+		"set session 1",
+		"run",
+		"use post/test/meterpreter",
+		"set addentropy true",
+		"set verbose true",
+		"set session 1",
+		"run"
+	],
+	"FAILURE_LIST": [
+		"FAILED"
+        ],
+	"SUCCESS_LIST": [
+		"[+] should return a list of processes",
+		"[+] should return a user id",
+		"[+] should return a sysinfo Hash",
+		"[+] should return network interfaces",
+		"[+] should have an interface that matches session_host",
+		"[+] should return the proper directory separator",
+		"[+] should return the current working directory",
+		"[+] should list files in the current directory",
+		"[+] should stat a directory",
+		"[+] should create and remove a dir",
+		"[+] should change directories",
+		"[+] should create and remove files",
+		"[+] should upload a file",
+		"[+] should move files",
+		"[+] should copy files",
+		"[+] should do md5 and sha1 of files"
+	]
+}
+

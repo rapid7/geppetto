@@ -124,6 +124,9 @@ def main():
                 currentDir = os.getcwd()
                 os.chdir(os.path.join(args.resultPath, os_dir, "reports"))
                 htmlFiles = glob.glob('*.html')
+                os.chdir(currentDir)
+                if len(htmlFiles) < 1:
+                    continue
                 fileName = htmlFiles[0]
                 os.chdir(currentDir)
                 localTestFolder = os.path.join(args.resultPath, os_dir)

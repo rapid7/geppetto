@@ -1,15 +1,13 @@
-[
-  {"name": "windows/meterpreter/bind_tcp", "opts":[]},
-  {"name": "windows/meterpreter/bind_tcp_uuid", "opts":[]},
-  {"name": "windows/meterpreter/reverse_http", "opts":[]},
-  {"name": "windows/meterpreter/reverse_https", "opts":[]},
-  {"name": "windows/meterpreter/reverse_tcp", "opts":[]},
-  {"name": "windows/meterpreter/reverse_tcp_dns", "opts":[]},
-  {"name": "windows/meterpreter/reverse_tcp_uuid", "opts":[]},
-  {"name": "windows/meterpreter/reverse_winhttp", "opts":[]},
-  {"name": "windows/meterpreter/reverse_winhttps", "opts":[]},
-  {"name": "windows/meterpreter_bind_tcp", "opts":[]},
-  {"name": "windows/meterpreter_reverse_http", "opts":[]},
-  {"name": "windows/meterpreter_reverse_https", "opts":[]},
-  {"name": "windows/meterpreter_reverse_tcp", "opts":[]}
-]
+windows/meterpreter/bind_tcp
+windows/meterpreter/bind_tcp_uuid
+windows/meterpreter/reverse_http
+windows/meterpreter/reverse_https
+windows/meterpreter/reverse_tcp
+windows/meterpreter/reverse_tcp_dns
+windows/meterpreter/reverse_tcp_uuid
+windows/meterpreter/reverse_winhttp
+windows/meterpreter/reverse_winhttps
+windows/meterpreter_bind_tcp
+windows/meterpreter_reverse_http
+windows/meterpreter_reverse_https
+windows/meterpreter_reverse_tcp

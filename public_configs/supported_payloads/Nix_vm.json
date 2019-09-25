@@ -1,0 +1,28 @@
+[
+  {"name":"linux/x64/meterpreter/bind_tcp", "opts": []},
+  {"name":"linux/x64/meterpreter/reverse_tcp", "opts": []},
+  {"name":"linux/x64/meterpreter_reverse_http", "opts": []},
+  {"name":"linux/x64/meterpreter_reverse_https", "opts": []},
+  {"name":"linux/x64/meterpreter_reverse_tcp", "opts": []},
+  {"name":"linux/x86/meterpreter/reverse_tcp_uuid", "opts": []},
+  {"name":"linux/x86/meterpreter_reverse_http", "opts": []},
+  {"name":"linux/x86/meterpreter_reverse_https", "opts": []},
+  {"name":"linux/x86/meterpreter_reverse_tcp", "opts": []},
+  {"name":"java/meterpreter/bind_tcp", "opts": []},
+  {"name":"java/meterpreter/reverse_tcp", "opts": []},
+  {"name":"java/meterpreter/reverse_http", "opts": []},
+  {"name":"java/meterpreter/reverse_https", "opts": []},
+  {"name":"java/meterpreter/bind_tcp", "opts": []},
+  {"name":"python/meterpreter/bind_tcp", "opts": []},
+  {"name":"python/meterpreter/bind_tcp_uuid", "opts": []},
+  {"name":"python/meterpreter/reverse_http", "opts": []},
+  {"name":"python/meterpreter/reverse_https", "opts": []},
+  {"name":"python/meterpreter/reverse_tcp", "opts": []},
+  {"name":"python/meterpreter/reverse_tcp_ssl", "opts": []},
+  {"name":"python/meterpreter/reverse_tcp_uuid", "opts": []},
+  {"name":"python/meterpreter_bind_tcp", "opts": []},
+  {"name":"python/meterpreter_reverse_http", "opts": []},
+  {"name":"python/meterpreter_reverse_https", "opts": []},
+  {"name":"python/meterpreter_reverse_tcp", "opts": []}
+]
+

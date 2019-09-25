@@ -33,10 +33,11 @@
 			"TYPE":			"VIRTUAL",
 			"HYPERVISOR_CONFIG":	"../JSON/esxi_config.json",
 			"METHOD":		"VM_TOOLS_UPLOAD",
-			"PAYLOAD_DIRECTORY":	"C:\\payload_test",
-			"PYTHON":		"C:\\tools\\python\\python.exe",
-			"METERPRETER_PYTHON":	"C:\\tools\\python\\python.exe",
-			"METERPRETER_JAVA":	"C:\\Program Files\\Java\\jre1.8.0_151\\java.exe"
+			"TESTING_SNAPSHOT":	"READY",
+			"PAYLOAD_DIRECTORY":	"/tmp/payloads",
+			"PYTHON":		"python2",
+			"METERPRETER_PYTHON":	"python",
+			"METERPRETER_JAVA":	"java"
 	},	
 	"MODULES":	
 	[

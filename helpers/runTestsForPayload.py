@@ -62,9 +62,9 @@ def main():
 
     cmdList = []
     for config in nightlyConfigs:
-        if testFilename in config['test_config']:
+        if testFilename in config['payload_files']:
             for payload in payloadList:
-                cmdString = "python autoPayloadTest.py -SS -p " + payload['name'].strip() + " " + config['test_config']
+                cmdString = "python autoPayloadTest.py -ss -p " + payload['name'].strip() + " " + config['test_config']
                 if len(payload['opts']) > 0:
                     cmdString += " -po "
                     for option in payload['opts']:

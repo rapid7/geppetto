@@ -25,6 +25,7 @@
 			"TYPE":			"VIRTUAL",
 			"HYPERVISOR_CONFIG":	"../JSON/esxi_config.json",
 			"METHOD":		"VM_TOOLS_UPLOAD",
+			"TESTING_SNAPSHOT":	"TargetNetwork",
 			"PAYLOAD_DIRECTORY":	"C:\\payload_test",
 			"PYTHON":		"C:\\tools\\python\\python.exe",
 			"METERPRETER_PYTHON":	"C:\\tools\\python\\python.exe",

@@ -33,6 +33,7 @@
 			"TYPE":			"VIRTUAL",
 			"HYPERVISOR_CONFIG":	"../JSON/esxi_config.json",
 			"METHOD":		"VM_TOOLS_UPLOAD",
+			"TESTING_SNAPSHOT":	"TargetNetwork",
 			"TESTING_SNAPSHOT":	"READY",
 			"PAYLOAD_DIRECTORY":	"/tmp/payloads",
 			"PYTHON":		"python2",

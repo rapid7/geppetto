@@ -16,6 +16,7 @@ def main():
     parser.add_argument("-v", "--verbose", help="Echo test result to console", action="store_true")
     parser.add_argument("-f", "--framework", help="Framework branch to use (Overrides testfile)")
     parser.add_argument("-m", "--module", help="Module to use")
+    parser.add_argument("-ss", "--skipSnapshotting", help="Skip intial snapshot and restore (trashes current VM state and leaves VMs on)", action="store_true")
     parser.add_argument("testfile", help="json payload file to use")
     args = parser.parse_args()
 
@@ -47,6 +48,11 @@ def main():
     else:
         verboseOption = ""
 
+    if args.skipSnapshotting != None:
+        skipSnapshottingOption = " -ss "
+    else:
+        skipSnapshottingOption = ""
+
     nightlyTestFile = 'public_configs/nightly_tests.json'
     nightlyConfigs = None
     try:
@@ -64,7 +70,7 @@ def main():
     for config in nightlyConfigs:
         if testFilename in config['payload_files']:
             for payload in payloadList:
-                cmdString = "python autoPayloadTest.py -ss -p " + payload['name'].strip() + " " + config['test_config']
+                cmdString = "python autoPayloadTest.py -p " + payload['name'].strip() + " " + config['test_config']
                 if len(payload['opts']) > 0:
                     cmdString += " -po "
                     for option in payload['opts']:
@@ -72,6 +78,7 @@ def main():
                 cmdString += frameworkOption
                 cmdString += moduleOption
                 cmdString += verboseOption
+                cmdString += skipSnapshottingOption
                 cmdList.append(cmdString)
 
     failures = 0

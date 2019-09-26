@@ -44,6 +44,20 @@
 	    "./public_configs/supported_payloads/java.json",
 	    "./public_configs/supported_payloads/python.json"
       ]
+  },
+  {
+    "test_config": "./public_configs/nightly_tests/Ssh_debian_buster_arm64.json",
+    "payload_files": 
+      [
+	    "./public_configs/supported_payloads/armle.json"
+      ]
+  },
+  {
+    "test_config": "./public_configs/nightly_tests/TheMoon_mipsel.json",
+    "payload_files": 
+      [
+	    "./public_configs/supported_payloads/mipsel.json"
+      ]
   }
 ]
 

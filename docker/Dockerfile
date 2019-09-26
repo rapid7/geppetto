@@ -1,5 +1,5 @@
 # To build the dev environment.
-# docker build -t rapid7/build:payload-testing .
+# docker build -t rapid7/geppetto:latest .
 
 FROM ubuntu:14.04.5
 MAINTAINER Jeffrey Martin <jeffrey_martin@rapid7.com> 

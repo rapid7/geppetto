@@ -1,44 +1,62 @@
 {
 	"HTTP_PORT":			5309,
-	"STARTING_LISTENER":		30000,
+	"STARTING_LISTENER":	30000,
 	"CREDS_FILE":			"../JSON/creds.json",
 	"MSF_HOSTS":
 	[
 		{
-			"TYPE":			"VIRTUAL",
-			"METHOD":		"VM_TOOLS_UPLOAD",
+			"TYPE":					"VIRTUAL",
+			"METHOD":				"VM_TOOLS_UPLOAD",
 			"HYPERVISOR_CONFIG":	"../JSON/esxi_config.json",
-			"CPE":			"cpe:/a:rapid7:metasploit:::",
-			"MSF_PATH":		"/home/msfuser/rapid7/metasploit-framework",
+			"CPE":					"cpe:/a:rapid7:metasploit:::",
+			"MSF_PATH":				"/home/msfuser/rapid7/metasploit-framework",
 			"MSF_ARTIFACT_PATH":	"/home/msfuser/rapid7/test_artifacts"
 		}
 	],
 	"TARGETS":
 	[
 		{
-		    "CPE": "cpe:/o:centos:centos:6::x64", 
-		    "CPE": "cpe:/o:centos:centos:7::x64", 
-		    "CPE": "cpe:/o:fedoraproject:fedora:25::x64", 
-		    "CPE": "cpe:/o:fedoraproject:fedora:26::x64", 
-		    "CPE": "cpe:/o:fedoraproject:fedora:27::x64", 
-		    "CPE": "cpe:/o:fedoraproject:fedora:28::x64", 
-		    "CPE": "cpe:/o:fedoraproject:fedora:29::x64", 
-		    "CPE": "cpe:/o:canonical:ubuntu_linux:14.04::x64", 
-		    "CPE": "cpe:/o:canonical:ubuntu_linux:16.04::x64", 
-		    "CPE": "cpe:/o:canonical:ubuntu_linux:18.04::x64"
+			"CPE": "cpe:/o:centos:centos:6::x64"
+		},
+		{
+			"CPE": "cpe:/o:centos:centos:7::x64"
+		},
+		{
+			"CPE": "cpe:/o:fedoraproject:fedora:25::x64"
+		},
+		{
+			"CPE": "cpe:/o:fedoraproject:fedora:26::x64"
+		},
+		{
+			"CPE": "cpe:/o:fedoraproject:fedora:27::x64"
+		},
+		{
+			"CPE": "cpe:/o:fedoraproject:fedora:28::x64"
+		},
+		{
+			"CPE": "cpe:/o:fedoraproject:fedora:29::x64"
+		},
+		{
+			"CPE": "cpe:/o:canonical:ubuntu_linux:14.04::x64"
+		},
+		{
+			"CPE": "cpe:/o:canonical:ubuntu_linux:16.04::x64"
+		},
+		{
+			"CPE": "cpe:/o:canonical:ubuntu_linux:18.04::x64"
 		}
 	],
 	"TARGET_GLOBALS":
 	{
-			"TYPE":			"VIRTUAL",
+			"TYPE":					"VIRTUAL",
 			"HYPERVISOR_CONFIG":	"../JSON/esxi_config.json",
-			"METHOD":		"VM_TOOLS_UPLOAD",
-			"TESTING_SNAPSHOT":	"TargetNetwork",
-			"TESTING_SNAPSHOT":	"READY",
+			"METHOD":				"VM_TOOLS_UPLOAD",
+			"TESTING_SNAPSHOT":		"TargetNetwork",
+			"TESTING_SNAPSHOT":		"READY",
 			"PAYLOAD_DIRECTORY":	"/tmp/payloads",
-			"PYTHON":		"python2",
+			"PYTHON":				"python2",
 			"METERPRETER_PYTHON":	"python",
-			"METERPRETER_JAVA":	"java"
+			"METERPRETER_JAVA":		"java"
 	},	
 	"MODULES":	
 	[
@@ -95,13 +113,13 @@
 		"[+] should move files",
 		"[+] should copy files",
 		"[+] should do md5 and sha1 of files",
-                "[+] should return the result of echo",
-                "[+] should return the result after sleeping",
-                "[+] should return the full response after sleeping",
-                "[+] should return the result of echo 10 times",
-                "[*] Finished cmd_exec tests",
-                "[*] Starting cmd_exec quote tests",
-                "[+] should return the result of echo with single quotes",
-                "[+] should return the result of echo with double quotes"
+		"[+] should return the result of echo",
+		"[+] should return the result after sleeping",
+		"[+] should return the full response after sleeping",
+		"[+] should return the result of echo 10 times",
+		"[*] Finished cmd_exec tests",
+		"[*] Starting cmd_exec quote tests",
+		"[+] should return the result of echo with single quotes",
+		"[+] should return the result of echo with double quotes"
 	]
 }

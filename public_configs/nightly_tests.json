@@ -4,14 +4,30 @@
     "payload_files": 
       [
   	    "./public_configs/supported_payloads/Win_Exe_x86.json",
-	    "./public_configs/supported_payloads/Win_Exe_x64.json"
+	    "./public_configs/supported_payloads/Win_Exe_x64.json",
+  	    "./public_configs/supported_payloads/python.json"
       ]
   },
   {
     "test_config": "./public_configs/nightly_tests/Win_10x86_meterpreter_nightly.json",
     "payload_files": 
       [
-	    "./public_configs/supported_payloads/Win_Exe_x86.json"
+	    "./public_configs/supported_payloads/Win_Exe_x86.json",
+  	    "./public_configs/supported_payloads/python.json"
+      ]
+  },
+  {
+    "test_config": "./public_configs/nightly_tests/Win_10x64_autologin_meterpreter_nightly.json",
+    "payload_files": 
+      [
+  	    "./public_configs/supported_payloads/java.json"
+      ]
+  },
+  {
+    "test_config": "./public_configs/nightly_tests/Win_10x86_autologin_meterpreter_nightly.json",
+    "payload_files": 
+      [
+  	    "./public_configs/supported_payloads/java.json"
       ]
   },
   {
@@ -19,7 +35,8 @@
     "payload_files": 
       [
 	    "./public_configs/supported_payloads/Win_Exe_x64.json",
-	    "./public_configs/supported_payloads/Win_Exe_x86.json"
+	    "./public_configs/supported_payloads/Win_Exe_x86.json",
+  	    "./public_configs/supported_payloads/python.json"
       ]
   },
   {
@@ -27,6 +44,20 @@
     "payload_files": 
       [
 	    "./public_configs/supported_payloads/Win_Exe_x86.json"
+      ]
+  },
+  {
+    "test_config": "./public_configs/nightly_tests/Win_7x64_8x64_autologin_meterpreter_nightly.json",
+    "payload_files": 
+      [
+  	    "./public_configs/supported_payloads/java.json"
+      ]
+  },
+  {
+    "test_config": "./public_configs/nightly_tests/Win_7x86_8x86_autologin_meterpreter_nightly.json",
+    "payload_files": 
+      [
+	    "./public_configs/supported_payloads/java.json"
       ]
   },
   {

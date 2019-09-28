@@ -18,6 +18,24 @@
 	[
 		{
 			"CPE": "cpe:/o:microsoft:windows_10:::x86"
+		},
+		{
+			"CPE": "cpe:/o:microsoft:windows_10:1511::x86"
+		},
+		{
+			"CPE": "cpe:/o:microsoft:windows_10:1607::x86"
+		},
+		{
+			"CPE": "cpe:/o:microsoft:windows_10:1703::x86"
+		},
+		{
+			"CPE": "cpe:/o:microsoft:windows_10:1709::x86"
+		},
+		{
+			"CPE": "cpe:/o:microsoft:windows_10:1803::x86"
+		},
+		{
+			"CPE": "cpe:/o:microsoft:windows_10:1809::x86"
 		}
 	],
 	"TARGET_GLOBALS":

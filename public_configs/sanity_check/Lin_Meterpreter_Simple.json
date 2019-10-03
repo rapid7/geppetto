@@ -16,9 +16,6 @@
 	"TARGETS":
 	[
 		{
-			"CPE":			"cpe:/o:fedoraproject:fedora:29::"
-		},
-		{
 			"CPE":			"cpe:/o:centos:centos:6::"
 		},
 		{

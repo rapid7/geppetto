@@ -115,11 +115,8 @@
 		"[+] should copy files",
 		"[+] should do md5 and sha1 of files",
 		"[+] should return the result of echo",
-		"[+] should return the result after sleeping",
 		"[+] should return the full response after sleeping",
 		"[+] should return the result of echo 10 times",
-		"[*] Finished cmd_exec tests",
-		"[*] Starting cmd_exec quote tests",
 		"[+] should return the result of echo with single quotes",
 		"[+] should return the result of echo with double quotes"
 	]

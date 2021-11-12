@@ -1,1 +1,4 @@
-vm-automation ~= 0.1.7
+vm-automation ~= 0.1.8
+pyvmomi
+tqdm
+cpe-utils

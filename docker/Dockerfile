@@ -19,19 +19,21 @@ RUN apt-get update && \
 	rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 ENV JENKINS_HOME /var/jenkins_home
-RUN useradd -d "$JENKINS_HOME" -u 1001 -m -s /bin/sh jenkins
+RUN useradd -d "$JENKINS_HOME" -u 1001 -m -s /bin/bash jenkins
 
 # TODO: this needs to run as jenkins user
 RUN su jenkins -c "curl -L https://raw.githubusercontent.com/pyenv/pyenv-installer/master/bin/pyenv-installer | bash" 
-RUN echo 'PATH="/var/jenkins_home/.pyenv/bin:$PATH"' >> /var/jenkins_home/.bash_profile 
+RUN echo 'export PATH="/var/jenkins_home/.pyenv/bin:$PATH"' >> /var/jenkins_home/.bash_profile 
 RUN echo 'eval "$(pyenv init -)"' >> $JENKINS_HOME/.bash_profile
+RUN echo 'export PATH="/var/jenkins_home/.pyenv/shims:$PATH"' >> /var/jenkins_home/.bash_profile 
 RUN echo 'eval "$(pyenv virtualenv-init -)"' >> $JENKINS_HOME/.bash_profile
 
-RUN su jenkins -c "/bin/bash -l -c 'pyenv install 2.7.13 && pyenv global 2.7.13'"
-RUN su jenkins -c "/bin/bash -l -c 'pip install --upgrade cpe-utils'"
-RUN su jenkins -c "/bin/bash -l -c 'pip install --upgrade pyvmomi'"
-RUN su jenkins -c "/bin/bash -l -c 'pip install --upgrade vm-automation'"
-RUN su jenkins -c "/bin/bash -l -c 'pip install --upgrade tqdm'"
+RUN su jenkins -c "/bin/bash -l -c '\
+  pyenv install 2.7.13 && pyenv global 2.7.13 && \
+  python -m pip install --upgrade cpe-utils && \
+  python -m pip install --upgrade pyvmomi && \
+  python -m pip install --upgrade vm-automation && \
+  python -m pip install --upgrade tqdm'"
 
 VOLUME "$JENKINS_HOME"
 RUN chown -R jenkins "$JENKINS_HOME"

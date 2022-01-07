@@ -67,6 +67,13 @@
 	    "./public_configs/supported_payloads/Win_Exe_x64.json"
       ]
   },
+    {
+    "test_config": "./public_configs/nightly_tests/Win_named_pipe_pivot.json",
+    "payload_files":
+      [
+	    "./public_configs/supported_payloads/Win_Exe_x64.json"
+      ]
+  },
   {
     "test_config": "./public_configs/nightly_tests/NixVM_meterpreter_nightly.json",
     "payload_files": 

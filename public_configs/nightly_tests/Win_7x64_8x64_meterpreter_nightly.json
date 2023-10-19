@@ -16,21 +16,6 @@
 	],
 	"TARGETS":
 	[
-		{
-			"CPE": "cpe:/o:microsoft:windows_7:::x64"
-		},
-		{
-			"CPE": "cpe:/o:microsoft:windows_7::sp1:x64"
-		},
-		{
-			"CPE": "cpe:/o:microsoft:windows_8:::x64"
-		},
-		{
-		    "CPE": "cpe:/o:microsoft:windows_8.1:::x64"
-		},
-		{
-		    "CPE": "cpe:/o:microsoft:windows_8.1::sp1:x64"
-		}
 	],
 	"TARGET_GLOBALS":
 	{

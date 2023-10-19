@@ -15,9 +15,6 @@
 	],
 	"TARGETS":
 	[
-		{
-			"CPE":			"cpe:/o:microsoft:windows_10:1709::x64"
-		}
 	],
 	"TARGET_GLOBALS":
 	{

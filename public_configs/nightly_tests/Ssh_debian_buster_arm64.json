@@ -16,9 +16,6 @@
 	],
 	"TARGETS":
 	[
-		{
-                        "CPE": "cpe:/o:::::arm64"
-		}
 	],
 	"MODULES":	
 	[

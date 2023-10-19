@@ -16,36 +16,6 @@
 	],
 	"TARGETS":
 	[
-		{
-			"CPE": "cpe:/o:centos:centos:6::x64"
-		},
-		{
-			"CPE": "cpe:/o:centos:centos:7::x64"
-		},
-		{
-			"CPE": "cpe:/o:fedoraproject:fedora:25::x64"
-		},
-		{
-			"CPE": "cpe:/o:fedoraproject:fedora:26::x64"
-		},
-		{
-			"CPE": "cpe:/o:fedoraproject:fedora:27::x64"
-		},
-		{
-			"CPE": "cpe:/o:fedoraproject:fedora:28::x64"
-		},
-		{
-			"CPE": "cpe:/o:fedoraproject:fedora:29::x64"
-		},
-		{
-			"CPE": "cpe:/o:canonical:ubuntu_linux:14.04::x64"
-		},
-		{
-			"CPE": "cpe:/o:canonical:ubuntu_linux:16.04::x64"
-		},
-		{
-			"CPE": "cpe:/o:canonical:ubuntu_linux:18.04::x64"
-		}
 	],
 	"TARGET_GLOBALS":
 	{

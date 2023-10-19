@@ -17,25 +17,7 @@
 	"TARGETS":
 	[
 		{
-		    "CPE": "cpe:/o:microsoft:windows_server_2008::r2:x64"
-		},
-		{
-		    "CPE": "cpe:/o:microsoft:windows_server_2008:r2:sp1:x64"
-		},
-		{
-		    "CPE": "cpe:/o:microsoft:windows_server_2012::r2:x64"
-		},
-		{
-		    "CPE": "cpe:/o:microsoft:windows_server_2012:r2:sp1:x64"
-		},
-		{
-		    "CPE": "cpe:/o:microsoft:windows_server_2012:::x64"
-		},
-		{
 		    "CPE": "cpe:/o:microsoft:windows_server_2016:::x64"
-		},
-		{
-		    "CPE": "cpe:/o:microsoft:windows_server_2019:::x64"
 		}
 	],
 	"TARGET_GLOBALS":

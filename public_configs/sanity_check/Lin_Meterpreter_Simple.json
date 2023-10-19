@@ -15,12 +15,6 @@
 	],
 	"TARGETS":
 	[
-		{
-			"CPE":			"cpe:/o:centos:centos:6::"
-		},
-		{
-			"CPE":			"cpe:/o:canonical:ubuntu_linux:16.04::"
-		}
 	],
 	"TARGET_GLOBALS":
 	{

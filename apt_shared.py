@@ -1029,7 +1029,7 @@ def prepStagedScripts(testConfig, portNum):
             if 'PAYLOAD' in sessionData \
                 and 'bind' in sessionData['PAYLOAD']['NAME'].lower() \
                 and sessionData['MODULE']['NAME'].lower() == 'exploit/multi/handler':
-                    launchBind = './msfconsole -qr '+ sessionData['RC_IN_SCRIPT_NAME'] + ' > ' + sessionData['RC_OUT_SCRIPT_NAME'] + '&\n'
+                    launchBind = './msfconsole -qr ' + sessionData['RC_IN_SCRIPT_NAME'] + ' > ' + sessionData['RC_OUT_SCRIPT_NAME'] + ' 2> ' + sessionData['RC_OUT_SCRIPT_NAME'] + ' &\n'
                     logLaunch = "echo 'LAUNCHING " + sessionData['RC_IN_SCRIPT_NAME'] + "' >> " + sessionData['MSF_HOST']['STAGE_THREE_LOGFILE'] + '\n'
                     sessionData['MSF_HOST']['STAGE_THREE_SCRIPT'] = sessionData['MSF_HOST']['STAGE_THREE_SCRIPT'] + launchBind
                     sessionData['MSF_HOST']['STAGE_THREE_SCRIPT'] = sessionData['MSF_HOST']['STAGE_THREE_SCRIPT'] + logLaunch
@@ -1037,8 +1037,8 @@ def prepStagedScripts(testConfig, portNum):
                     sessionData['MSF_HOST']['STAGE_THREE_SCRIPT'] = sessionData['MSF_HOST']['STAGE_THREE_SCRIPT'] + logLaunch
                     sessionData['MSF_HOST']['STAGE_THREE_SCRIPT'] = sessionData['MSF_HOST']['STAGE_THREE_SCRIPT'] + "sleep 10\n"
             else:
-                stageOneContent = stageOneContent + './msfconsole -qr '+ \
-                                        sessionData['RC_IN_SCRIPT_NAME'] + ' > ' + sessionData['RC_OUT_SCRIPT_NAME'] + ' &\n'
+                stageOneContent = stageOneContent + './msfconsole -qr ' + \
+                                        sessionData['RC_IN_SCRIPT_NAME'] + ' > ' + sessionData['RC_OUT_SCRIPT_NAME'] + ' 2> ' + sessionData['RC_OUT_SCRIPT_NAME'] + ' &\n'
             sessionData['MSF_HOST']['STAGE_ONE_SCRIPT'] = sessionData['MSF_HOST']['STAGE_ONE_SCRIPT'] + stageOneContent
     return sessionCounter
 

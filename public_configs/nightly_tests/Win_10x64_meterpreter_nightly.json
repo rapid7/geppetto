@@ -16,27 +16,6 @@
 	],
 	"TARGETS":
 	[
-		{
-			"CPE": "cpe:/o:microsoft:windows_10:::x64"
-		},
-		{
-			"CPE": "cpe:/o:microsoft:windows_10:1511::x64"
-		},
-		{
-			"CPE": "cpe:/o:microsoft:windows_10:1607::x64"
-		},
-		{
-			"CPE": "cpe:/o:microsoft:windows_10:1703::x64"
-		},
-		{
-			"CPE": "cpe:/o:microsoft:windows_10:1709::x64"
-		},
-		{
-			"CPE": "cpe:/o:microsoft:windows_10:1803::x64"
-		},
-		{
-			"CPE": "cpe:/o:microsoft:windows_10:1809::x64"
-		}
 	],
 	"TARGET_GLOBALS":
 	{
@@ -45,9 +24,9 @@
 			"METHOD":				"VM_TOOLS_UPLOAD",
 			"TESTING_SNAPSHOT":		"TargetNetwork",
 			"PAYLOAD_DIRECTORY":	"C:\\payload_test",
-			"PYTHON":				"C:\\tools\\python\\python.exe",
-			"METERPRETER_PYTHON":	"C:\\tools\\python\\python.exe",
-			"METERPRETER_JAVA":		"C:\\Program Files\\Java\\jre1.8.0_151\\java.exe"
+			"PYTHON":				"C:\\Python34\\python.exe",
+			"METERPRETER_PYTHON":	"C:\\Python34\\python.exe",
+			"METERPRETER_JAVA":		"C:\\Program Files\\Eclipse Adoptium\\jre-8.0.382.5-hotspot\\bin\\java.exe"
 	},	
 	"MODULES":	
 	[

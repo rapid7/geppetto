@@ -15,9 +15,6 @@
 	],
 	"TARGETS":
 	[
-		{
-			"CPE":			"cpe:/o:microsoft:windows_10:1709::x64"
-		}
 	],
 	"TARGET_GLOBALS":
 	{
@@ -26,9 +23,9 @@
 			"HYPERVISOR_CONFIG":	"../JSON/esxi_config.json",
 			"METHOD":		"VM_TOOLS_UPLOAD",
 			"PAYLOAD_DIRECTORY":	"C:\\payload_test",
-			"PYTHON":		"C:\\tools\\python\\python.exe",
-			"METERPRETER_PYTHON":	"C:\\tools\\python\\python.exe",
-			"METERPRETER_JAVA":	"C:\\Program Files\\Java\\jre1.8.0_161\\bin\\java.exe"
+			"PYTHON":		"C:\\Python34\\python.exe",
+			"METERPRETER_PYTHON":	"C:\\Python34\\python.exe",
+			"METERPRETER_JAVA":	"C:\\Program Files\\Eclipse Adoptium\\jre-8.0.382.5-hotspot\\bin\\java.exe"
 	},
 	"MODULES":	
 	[

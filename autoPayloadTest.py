@@ -26,6 +26,10 @@ def main():
     """
     configData['TARGETS'] = apt_shared.convertAbstractTargets(configData['TARGETS'], configData['CREDS_FILE'], configData['LOG_FILE'])
     configData['MSF_HOSTS'] = apt_shared.confirmMsfHosts(configData['MSF_HOSTS'], configData['CREDS_FILE'], configData['LOG_FILE'])
+    print("------------------")
+    print("Attempting to print ConfigData..: ")
+    print(configData)
+    print("------------------")
     if type(configData['TARGETS']) == bool:
         print("NO TARGETS FOUND IN CATALOG")
         exit(999)
@@ -38,12 +42,12 @@ def main():
     NB: I THINK USING GLOBAL EXPLOITS IS A TERRIBLE IDEA, BUT I AM AN ENABLER
     """
     apt_shared.expandPayloadsAndModules(configData)
-     
+
     # portValue TRACKS PORTS SO WE DO NOT REUSE A PORT AND CAUSE A PROBLEM
     portNum = apt_shared.portValue(configData['STARTING_LISTENER'])
     # REPLACE 'UNIQUE_PORT' WILDCARD WITH AN ACTUAL UNIQUE PORT
     apt_shared.replacePortKeywords(configData, portNum)
-    
+
     # DEBUG PRINT
     for target in configData['TARGETS']:
         if 'PAYLOADS' in target:
@@ -56,6 +60,8 @@ def main():
     TO HELP TRACK THE ACTUAL SESSIONS ESTABLISHED (IF ANY)
     """
     if not apt_shared.setupSessionData(configData):
+        print("About to bail...")
+        print(configData)
         apt_shared.bailSafely(configData)
 
     # DEBUG PRINT

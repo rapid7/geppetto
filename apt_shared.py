@@ -494,6 +494,7 @@ def logMsg(logFile, strMsg):
     if strMsg == None:
         strMsg="[None]"
     dateStamp = 'testlog:[' + str(datetime.now())+ '] '
+    print(dateStamp + strMsg)
     if logFile == None:
         return False
     else:

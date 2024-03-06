@@ -12,12 +12,12 @@ class portValue:
     """
     THE BELOW portValue CLASS IS HOW I DECIDED TO TRACK THE PORT NUMBERS
     I WANTED A SINGLETON, BUT I FOUND NOTHING IN PYTHON THAT DID THAT.
-    THIS CLASS LETS ME SIMPLY CALL get.portValue() AND IT RETURNS A 
+    THIS CLASS LETS ME SIMPLY CALL get.portValue() AND IT RETURNS A
     UNIQUE PORT VALUE, SO I DO NOT HAVE TO TRACK WHICH VALUES HAVE BEEN USED.
     """
     def __init__(self, initialValue):
         self.portNumber = initialValue
-        
+
     def get(self):
         self.portNumber = self.portNumber + 1
         return self.portNumber
@@ -25,6 +25,7 @@ class portValue:
 
 def bailSafely(testConfig):
     if testConfig != None and 'LOG_FILE' in testConfig:
+        logMsg(logfile, "not none in bailsafely")
         logFile = testConfig['LOG_FILE']
         logMsg(logFile, "AN ERROR HAPPENED; RETURNING VMS TO THEIR FULL UPRIGHT AND LOCKED POSITIONS")
         timeToWait = 10
@@ -59,7 +60,7 @@ def breakoutClones(hostDicList, logFile):
                     elif item == 'HYPERVISOR_CONFIG':
                         if 'HYPERVISOR_CONFIG' in clone:
                             cloneDic[item] = clone['HYPERVISOR_CONFIG']
-                        else: 
+                        else:
                             cloneDic[item] = host['HYPERVISOR_CONFIG']
                     elif item == 'SESSION_DATASETS':
                         if 'SESSION_DATASETS' not in clone:
@@ -494,6 +495,7 @@ def logMsg(logFile, strMsg):
     if strMsg == None:
         strMsg="[None]"
     dateStamp = 'testlog:[' + str(datetime.now())+ '] '
+    print(dateStamp + strMsg)
     if logFile == None:
         return False
     else:
